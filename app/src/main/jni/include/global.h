@@ -49,8 +49,8 @@
 #define INT64  __int64
 #define EXIT(ret)   system("pause")//exit(ret)
 #else
-#define UINT64 unsigned long long
-#define INT64 long long
+#define mUINT64 unsigned long long
+#define mINT64 long long
 #define EXIT(ret)  exit(ret)
 #endif
 

@@ -4,9 +4,11 @@
 #include "include/fileIO.h"
 #include "log.h"
 
+
+
 #define FSEEK64 fseek
 
-INT32 widthBytes(INT32 width, INT32 bitCount)//BitCount λ��/����
+INT32 widthBytes(INT32 width, INT32 bitCount)//BitCount
 {
     INT32 WBytes;
     WBytes = (width*bitCount+31)/8;
@@ -53,7 +55,8 @@ INT32 readHeaderBmp(INT8 *pInFileName, INT32 *pWidth, INT32 *pHeight, INT32 *nCh
     return 0;
 }
 
-INT32 readImageBmp(INT8 *pInFileName, UINT8 *pdat, INT32 width, INT32 height, INT32 heightClip, INT32 nChannel, INT32 dstWBytes)
+INT32 readImageBmp(INT8 *pInFileName, UINT8 *pdat, INT32 width, INT32 height,
+                INT32 heightClip, INT32 nChannel, INT32 dstWBytes)
 {
     INT32   i,j;
     INT32   srcWBytes;
@@ -120,7 +123,8 @@ INT32 readImageBmp(INT8 *pInFileName, UINT8 *pdat, INT32 width, INT32 height, IN
 }
 
 
-INT32 writeImageBmp_RGB24(UINT8 *pRGB, INT32 width, INT32 height, INT8 *pOutFileName, INT32 srcMarginW, INT32 srcMarginH)
+INT32 writeImageBmp_RGB24(UINT8 *pRGB, INT32 width, INT32 height,
+            INT8 *pOutFileName, INT32 srcMarginW, INT32 srcMarginH)
 {
     INT32 x = 0;
     INT32 y = 0;
@@ -192,7 +196,29 @@ void skipComments(FILE *fp)
     ungetc(ch, fp);      /* Replace last character read. */
 }
 
-INT32 readPgmFile(PTYPE *pDataBuffB,PTYPE *pDataBuffG,PTYPE *pDataBuffR, INT32 *pWidth, INT32 *pHeight, INT32 depth, INT8 *pInFileName)
+
+INT32 readRgbFile(PTYPE *pDataBuffB,PTYPE *pDataBuffG,PTYPE *pDataBuffR,
+                    INT32 pWidth, INT32 pHeight, INT32 depth, INT8 *pInFileName)
+{
+    LOGE("readRgbFile:rgb picture width = %d, height = %d \n", pWidth, pHeight);
+    Mat rgbImage,bayer;
+    bayer = imread(pInFileName,0);
+    cvtColor(bayer, rgbImage, CV_BayerBG2BGR);
+    vector<Mat> bgr;
+    //分离后各通道
+    rgbImage.convertTo(rgbImage,CV_16UC1);
+    split(rgbImage,bgr);
+    memcpy(pDataBuffB,bgr[0].data,pHeight*pWidth*sizeof(PTYPE));
+    memcpy(pDataBuffG,bgr[1].data,pHeight*pWidth*sizeof(PTYPE));
+    memcpy(pDataBuffR,bgr[2].data,pHeight*pWidth*sizeof(PTYPE));
+    //Mat SingleImage(pHeight,pWidth,CV_16UC1,pDataBuffR);
+    //imwrite("/sdcard/SingleImage.jpg",SingleImage);
+    LOGE("readRgbFile has been finished!");
+    return 0;
+}
+
+INT32 readPgmFile(PTYPE *pDataBuffB,PTYPE *pDataBuffG,PTYPE *pDataBuffR,
+                INT32 *pWidth, INT32 *pHeight, INT32 depth, INT8 *pInFileName)
 {
     FILE      *fp           = NULL;
     INT32 char1, char2, w, h, max, c1, c2, c3, x, y;
@@ -222,6 +248,7 @@ INT32 readPgmFile(PTYPE *pDataBuffB,PTYPE *pDataBuffG,PTYPE *pDataBuffR, INT32 *
     
     *pWidth = w;
     *pHeight = h;
+    //LOGE("readPgmFile:pgm picture width = %d, height = %d \n",w,h);
 
     fgetc(fp);  /* Discard exactly one byte after header. */
 
@@ -377,7 +404,7 @@ int readRawYUVSeq(INT32 *pChannelWidthBuf,
 
     for (i = clipRect.top; i < clipRect.down; i++)
     {
-        FSEEK64(fp, (INT64)seekFrame*framesize*3/2 + i*YrgbWidth + clipRect.left, SEEK_SET);
+        FSEEK64(fp, (mINT64)seekFrame*framesize*3/2 + i*YrgbWidth + clipRect.left, SEEK_SET);
         for (j = clipRect.left; j < clipRect.right; j++)
         {
             retNum = fread(pChannelBuffRY++, sizeof(unsigned char), 1, fp);
@@ -389,7 +416,7 @@ int readRawYUVSeq(INT32 *pChannelWidthBuf,
     {
         for (i = clipRect.top/2; i < clipRect.down/2; i++)
         {
-            FSEEK64(fp, (INT64)seekFrame*framesize*3/2 + framesize + (i*YrgbWidth + clipRect.left)/2, SEEK_SET);
+            FSEEK64(fp, (mINT64)seekFrame*framesize*3/2 + framesize + (i*YrgbWidth + clipRect.left)/2, SEEK_SET);
             for (j = clipRect.left/2; j < clipRect.right/2; j++)
             {
                 unsigned char pixval;
@@ -413,7 +440,7 @@ int readRawYUVSeq(INT32 *pChannelWidthBuf,
         }
         for (i = clipRect.top/2; i < clipRect.down/2; i++)
         {
-            FSEEK64(fp, (INT64)seekFrame*framesize*3/2 + framesize*5/4 + (i*YrgbWidth + clipRect.left)/2, SEEK_SET);
+            FSEEK64(fp, (mINT64)seekFrame*framesize*3/2 + framesize*5/4 + (i*YrgbWidth + clipRect.left)/2, SEEK_SET);
             for (j = clipRect.left/2; j < clipRect.right/2; j++)
             {
                 unsigned char pixval;
@@ -439,7 +466,7 @@ int readRawYUVSeq(INT32 *pChannelWidthBuf,
     {
         for (i = clipRect.top/2; i < clipRect.down/2; i++)
         {
-            FSEEK64(fp, (INT64)seekFrame*framesize*3/2 + framesize + (i*YrgbWidth + clipRect.left), SEEK_SET);
+            FSEEK64(fp, (mINT64)seekFrame*framesize*3/2 + framesize + (i*YrgbWidth + clipRect.left), SEEK_SET);
             for (j = clipRect.left/2; j < clipRect.right/2; j++)
             {
                 char pixvalCb, pixValCr;
@@ -527,7 +554,7 @@ int writeRawYUVSeq(INT32 *pChannelWidthBuf,
     {
         for (i = clipRect.top; i < clipRect.down; i++)
         {
-            FSEEK64(fp, (INT64)seekFrame*framesize*3/2 + i*YrgbWidth + clipRect.left, SEEK_SET);
+            FSEEK64(fp, (mINT64)seekFrame*framesize*3/2 + i*YrgbWidth + clipRect.left, SEEK_SET);
             for (j = clipRect.left; j < clipRect.right; j++)
             {
                 retNum = fwrite(pChannelBuffRY++, sizeof(char), 1, fp);
@@ -537,7 +564,7 @@ int writeRawYUVSeq(INT32 *pChannelWidthBuf,
 
         for (i = clipRect.top/2; i < clipRect.down/2; i++)
         {
-            FSEEK64(fp, (INT64)seekFrame*framesize*3/2 + framesize + (i*YrgbWidth + clipRect.left)/2, SEEK_SET);
+            FSEEK64(fp, (mINT64)seekFrame*framesize*3/2 + framesize + (i*YrgbWidth + clipRect.left)/2, SEEK_SET);
             for (j = clipRect.left/2; j < clipRect.right/2; j++)
             {
                 retNum = fwrite(pChannelBuffGCb++, sizeof(char), 1, fp);
@@ -546,7 +573,7 @@ int writeRawYUVSeq(INT32 *pChannelWidthBuf,
         }
         for (i = clipRect.top/2; i < clipRect.down/2; i++)
         {
-            FSEEK64(fp, (INT64)seekFrame*framesize*3/2 + framesize*5/4 + (i*YrgbWidth + clipRect.left)/2, SEEK_SET);
+            FSEEK64(fp, (mINT64)seekFrame*framesize*3/2 + framesize*5/4 + (i*YrgbWidth + clipRect.left)/2, SEEK_SET);
             for (j = clipRect.left/2; j < clipRect.right/2; j++)
             {
                 retNum = fwrite(pChannelBuffBCr++, sizeof(char), 1, fp);
@@ -558,7 +585,7 @@ int writeRawYUVSeq(INT32 *pChannelWidthBuf,
     {
         for (i = clipRect.top; i < clipRect.down; i++)
         {
-            FSEEK64(fp, (INT64)seekFrame*framesize*3 + i*YrgbWidth + clipRect.left, SEEK_SET);
+            FSEEK64(fp, (mINT64)seekFrame*framesize*3 + i*YrgbWidth + clipRect.left, SEEK_SET);
             for (j = clipRect.left; j < clipRect.right; j++)
             {
                 retNum = fwrite(pChannelBuffRY++, sizeof(char), 1, fp);
@@ -568,7 +595,7 @@ int writeRawYUVSeq(INT32 *pChannelWidthBuf,
 
         for (i = clipRect.top; i < clipRect.down; i++)
         {
-            FSEEK64(fp, (INT64)seekFrame*framesize*3 + framesize + (i*YrgbWidth + clipRect.left), SEEK_SET);
+            FSEEK64(fp, (mINT64)seekFrame*framesize*3 + framesize + (i*YrgbWidth + clipRect.left), SEEK_SET);
             for (j = clipRect.left; j < clipRect.right; j++)
             {
                 retNum = fwrite(pChannelBuffGCb++, sizeof(char), 1, fp);
@@ -577,7 +604,7 @@ int writeRawYUVSeq(INT32 *pChannelWidthBuf,
         }
         for (i = clipRect.top; i < clipRect.down; i++)
         {
-            FSEEK64(fp, (INT64)seekFrame*framesize*3 + framesize*2 + (i*YrgbWidth + clipRect.left), SEEK_SET);
+            FSEEK64(fp, (mINT64)seekFrame*framesize*3 + framesize*2 + (i*YrgbWidth + clipRect.left), SEEK_SET);
             for (j = clipRect.left; j < clipRect.right; j++)
             {
                 retNum = fwrite(pChannelBuffBCr++, sizeof(char), 1, fp);

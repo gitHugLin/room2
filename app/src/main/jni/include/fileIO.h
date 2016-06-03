@@ -8,6 +8,8 @@
 
 #include <sys/stat.h>
 #include "include/dataType.h"
+
+
 #ifndef WIN32
 #define STAT64 stat64
 #define FSEEK64 fseeko64
@@ -17,12 +19,9 @@
 #define FSEEK64 _fseeki64
 #define FILEPATH_SLASH '\\'
 
-
-
 //Following Macro is ONLY for C Model Debug
 //direct load one YUV420p bin file, instead of two ASCII files(Y + UV)
-//direct load ARGB .bmp file
-#define LOAD_RAW_DATA   
+
 
 #endif
 

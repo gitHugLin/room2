@@ -2,7 +2,6 @@
 #define __DATA_TYPE_H__
 
 
-
 typedef int            INT32;
 typedef unsigned int   UINT32;
 typedef short          INT16;

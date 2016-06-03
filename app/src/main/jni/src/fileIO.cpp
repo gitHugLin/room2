@@ -33,22 +33,20 @@ INT8 imgFormatNameBuf[IMG_FORMAT_COUNT][20] =
 
 /******************************************************************************/
 
-INT32 readAlignedFileToBuffer(UINT16 *pDataBuff, INT32 sizeInHlfWord, INT8 *pInFileName, IO_FILE_FORMAT inFileFormat)
+INT32 readAlignedFileToBuffer(UINT16 *pDataBuff, INT32 sizeInHlfWord,
+            INT8 *pInFileName, IO_FILE_FORMAT inFileFormat)
 {
     FILE      *fp       = NULL;
     UINT32    temp;
     INT32     i, ret;
 
     fp = fopen(pInFileName, "r");
-
-    if (fp == NULL)
-    {
+    if (fp == NULL) {
         LOGE("Fail open file %s in readAlignedFileToBuffer. \n", pInFileName);
         return -1;
     }
     
-    switch(inFileFormat)
-    {
+    switch(inFileFormat) {
         case IO_FILE_FORMAT_ASCII_48BIT_PER_LINE:
             for (i = 0; i < sizeInHlfWord; i++)
             {
@@ -60,7 +58,7 @@ INT32 readAlignedFileToBuffer(UINT16 *pDataBuff, INT32 sizeInHlfWord, INT8 *pInF
                 }
                 else
                 {
-                    LOGE("End of file in readAlignedFileToBuffer \n");
+                    LOGE("End of file in readAlignedFileToBuffer roundCounts = %d\n",ret);
                     fclose(fp);
                     EXIT(-1);
                 }
@@ -142,6 +140,10 @@ INT32 writeAlignedBufferToFile(UINT16 *pDataBuff, INT32 sizeInHlfWord, INT8 *pOu
     return 0;
 }
 
+
+
+#define LOAD_RAW_DATA
+//direct load ARGB .bmp file
 // INPUT FILE: 6Byte(one pixel) PerLine, ASCII
 //
 // B=0x89a, G=0x9ab, R=0xabc
@@ -167,20 +169,29 @@ INT32 loadChannelData(IMG_FORMAT format,
 
     INT32     pixSize, pixOffset;
 
-#ifdef LOAD_RAW_DATA    
+#ifdef LOAD_RAW_DATA
     static int frameNum = 0;
 #endif
 
 #ifdef LOAD_RAW_DATA
+    LOGE("Load pmg file %s !\n", pInFileName);
     if((format == IMG_FORMAT_RGB101010 || format == IMG_FORMAT_RGB121212 ) && (strstr(pInFileName, ".pgm") != NULL))
     {
         INT32 w, h; //reserved for file check
         INT32 depth = (format == IMG_FORMAT_RGB101010)?10:12;
-        return readPgmFile(ppChannelBuff[CHANNEL_BCr],ppChannelBuff[CHANNEL_GCb],ppChannelBuff[CHANNEL_RY], 
-            &w, &h, depth, pInFileName);
+
+        return readRgbFile(ppChannelBuff[CHANNEL_BCr],ppChannelBuff[CHANNEL_GCb],ppChannelBuff[CHANNEL_RY],
+                    YrgbWidth, YrgbHeight, depth, pInFileName);
+        //INT32 ret = readPgmFile(ppChannelBuff[CHANNEL_BCr],ppChannelBuff[CHANNEL_GCb],ppChannelBuff[CHANNEL_RY],
+            //&w, &h, depth, pInFileName);
+        //Mat SingleImage(h,w,CV_8UC1,ppChannelBuff[CHANNEL_BCr]);
+        //imwrite("/sdcard/SingleImage.jpg",SingleImage);
+        //LOGE("write SingleImage File has been finished!");
+        //return ret;
+
     }
 #endif
-
+LOGE("readAlignedFileToBuffer is running !\n");
     /************************************************************/
     pixSize = YrgbWidth*YrgbHeight;
     MALLOC(pYrgbBuf, UINT16, pixSize*3);
@@ -208,6 +219,7 @@ INT32 loadChannelData(IMG_FORMAT format,
     return 0;
 }
 
+//convert input .pgm img to .dat
 INT32 dumpChannelData(IMG_FORMAT format,
                             INT32 *pChannelWidthBuf,
                             INT32 *pChannelHeightBuf,
@@ -293,6 +305,7 @@ INT32 renameBmpFile(INT8 *pDstName, INT8 *pSrcName)
     return 0;
 }
 
+
 PTYPE getNonlinearRGB(PTYPE imVal, INT32 bitdepth)
 {
     double val = (double)imVal/BIT_MASK(bitdepth);
@@ -305,9 +318,9 @@ PTYPE getNonlinearRGB(PTYPE imVal, INT32 bitdepth)
 }
 
 // OUTPUT FILE:
-//      RGB888 bmp, with no alpha channel
+// RGB888 bmp, with no alpha channel
 // pClipRect = NULL : no clip
-//gammaCorrect: linearRGB->NonlinearRGB
+// gammaCorrect: linearRGB->NonlinearRGB
 INT32 dumpPixelsDataToBmpFile(IMG_FORMAT format,
                             INT32 *pChannelWidthBuf,
                             INT32 *pChannelHeightBuf,

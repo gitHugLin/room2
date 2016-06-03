@@ -1,6 +1,9 @@
 #ifndef __GAUSE_FILTER_H__
 #define __GAUSE_FILTER_H__
 #include "include/dataType.h"
+
+
+
 #define GAUSE_FACTOR_FIXPOINT_BITS       5 
 #define GAUSE_FACTOR_FIXPOINT_FACTOR(x)        ( (INT32)((x)*(1<<GAUSE_FACTOR_FIXPOINT_BITS)) )
 //zty: #define GAUSE_NORM_FIXPOINT_BITS       17
@@ -29,8 +32,8 @@ typedef struct _GAUSE_PYRAMID_KERNELS
     INT32   heightClipped;
     INT32   *factors[PYRAMID_LEVELS];
     INT32   normFactor[PYRAMID_LEVELS];
-    INT32  epsilon;   //EPSILON_FIXPOINT_BITS
-    INT32  pym_cc;
+    INT32   epsilon;   //EPSILON_FIXPOINT_BITS
+    INT32   pym_cc;
 }GAUSE_PYRAMID_KERNELS;
 
 INT32 genHwGauseKernel(INT32 level, INT32 *pFilterFactor, INT32 rows, INT32 cols, INT32 scale);

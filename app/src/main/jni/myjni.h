@@ -5,6 +5,7 @@
 
 #ifndef MY_JNI_MYJNI_H
 #define MY_JNI_MYJNI_H
+
 #ifdef __cplusplus
 extern "C" {
 #endif

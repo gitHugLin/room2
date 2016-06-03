@@ -12,7 +12,7 @@
 #define RATIO_FIXPOINT_FACTOR(x)    ((INT32)((x)*(1<<RATIO_FIXPOINT_BITS)))
 #define RATIO_FIXPOINT_REVERT(fixval)   ( ((fixval) + (1<<(RATIO_FIXPOINT_BITS-1))) >> RATIO_FIXPOINT_BITS )
 
-#define USING_GAIN_LUT    0   // //1: Tone curve存储的是增益系数Lnew/L    0:Tone curve存储的是Lnew
+#define USING_GAIN_LUT    0   // //1: Tone     0:Tone
 
 //#define Y_CHANNEL_BITS 10   //Y Channel bitdepth default:10 //not used
 
@@ -35,8 +35,8 @@ typedef struct _TONE_CURVE
     INT32  xBitDepth;
     INT32  dxBitDepth;
     INT32  bDec; //0: increase 1:decrease 
-    INT8   xDeltN[TONE_CURVE_SEG_COUNT]; //起始点x=0
-    INT32  y[TONE_CURVE_SEG_COUNT+1];    //含起始点的y值,TONE_GAIN_FIXPOINT_BITS
+    INT8   xDeltN[TONE_CURVE_SEG_COUNT];
+    INT32  y[TONE_CURVE_SEG_COUNT+1];    //TONE_GAIN_FIXPOINT_BITS
     INT32  noiseRatio;
     INT32  gainOffset;
     INT32  rgbOffset;

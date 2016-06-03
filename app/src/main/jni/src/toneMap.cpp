@@ -20,7 +20,8 @@ PTYPE lumiFixpoints(PTYPE *pLumiBuff, PTYPE *pLmLpBuff, INT32 width, INT32 heigh
 	return 0;
 }
 
-PTYPE getAvgLumiChannel(PTYPE **ppChannelBuff,PTYPE *pAvgLumiBuff, WDR_PARAMETER *param, INT32 width, INT32 height)
+PTYPE getAvgLumiChannel(PTYPE **ppChannelBuff,PTYPE *pAvgLumiBuff,
+                WDR_PARAMETER *param, INT32 width, INT32 height)
  {
 	INT32 x, y, offset;
 	PTYPE channelR, channelG, channelB;
@@ -42,13 +43,11 @@ PTYPE getAvgLumiChannel(PTYPE **ppChannelBuff,PTYPE *pAvgLumiBuff, WDR_PARAMETER
 			channelG = ppChannelBuff[CHANNEL_GCb][offset];
 			channelB = ppChannelBuff[CHANNEL_BCr][offset];
 
-
 			lumi = coeChannelR * channelR + coeChannelG * channelG + coeChannelB * channelB + coeOffset;
+			//lumi >> 8 (lumi/256)
 			lumi = FIXPOINT_CLIP(lumi, R2Y_COE_FIXPOINT_BITS);
 			lumi = MIN(lumi, 0xfff);
-          //#if Y_CHANNEL_BITS == 10		
-	      //  lumi = (lumi >> 2) << 2;
-          //#endif
+
 			pAvgLumiBuff[offset] = lumi;
 			avgL += pAvgLumiBuff[offset];
 		}
@@ -58,44 +57,41 @@ PTYPE getAvgLumiChannel(PTYPE **ppChannelBuff,PTYPE *pAvgLumiBuff, WDR_PARAMETER
 }
 
 //INT32 initBlockLumi(PTYPE *pAvgLumiBuff, PTYPE *blkLumiBuff, INT32 width, INT32 height, INT32 blkWidth, INT32 blkHeight)
-INT32 getBlockLumi(PTYPE *pAvgLumiBuff, INT32 *blkLumiBuff, INT32 width, INT32 height, INT32 blkWidth, INT32 blkHeight, WDR_PARAMETER *param)
+INT32 getBlockLumi(PTYPE *pAvgLumiBuff, INT32 *blkLumiBuff,
+                INT32 width, INT32 height, INT32 blkWidth, INT32 blkHeight, WDR_PARAMETER *param)
 {
 	INT32 x, y, offset;
 	INT8 blkX, blkY, blkOffset;
 	INT32 xRest, yRest,curAvgLumiVal;
+	// G_wdr_para.sw_wdr_bestlight   = 0x0cf0
+    // G_wdr_para.sw_wdr_noiseratio  = 0x00c0
 	INT32 noiseRatio = ((param->sw_wdr_noiseratio)>>4)<<4; //clip low 4bits, 20160330
 	INT32 bestLight  = ((param->sw_wdr_bestlight )>>4)<<4; //clip low 4bits, 20160330
 	//blkRow = height >> TONE_MAP_BLK_SIZEBITS;
 	//blkCol = width >> TONE_MAP_BLK_SIZEBITS;
 	xRest = (blkWidth << TONE_MAP_BLK_SIZEBITS) - width;
 	yRest = (blkHeight << TONE_MAP_BLK_SIZEBITS) - height;
-	
-	for( y = 0; y < height; y++)
-	{
-		for(x = 0; x < width; x++)
-		{
+
+	for( y = 0; y < height; y++) {
+		for(x = 0; x < width; x++) {
+
 			offset = y * width + x;
 			blkX = x >> TONE_MAP_BLK_SIZEBITS;
 			blkY = y >> TONE_MAP_BLK_SIZEBITS;
 			blkOffset = blkY * blkWidth + blkX;
 
+	        curAvgLumiVal = (pAvgLumiBuff[offset]>>2)<<2; //pAvgLumiBuff[offset], update for nonl_mode1=1(closed), 20160420
+		    blkLumiBuff[blkOffset] += curAvgLumiVal;
 
-	    curAvgLumiVal = (pAvgLumiBuff[offset]>>2)<<2; //pAvgLumiBuff[offset], update for nonl_mode1=1(closed), 20160420
-		  blkLumiBuff[blkOffset] += curAvgLumiVal; 
-
-
-			if(x == width-1)
-			{
-				blkLumiBuff[blkOffset] += xRest * curAvgLumiVal;
-			}
-			if(y == height-1)
-			{
-				blkLumiBuff[blkOffset] += yRest * curAvgLumiVal;
-			}
-			if(x == width-1 && y == height-1)
-			{
-				blkLumiBuff[blkWidth*blkHeight-1] += xRest*yRest * curAvgLumiVal;
-			}
+	        if(x == width-1) {
+	            blkLumiBuff[blkOffset] += xRest * curAvgLumiVal;
+		    }
+		    if(y == height-1) {
+			    blkLumiBuff[blkOffset] += yRest * curAvgLumiVal;
+	        }
+	        if(x == width-1 && y == height-1) {
+		        blkLumiBuff[blkWidth*blkHeight-1] += xRest*yRest * curAvgLumiVal;
+		    }
 		}
 	}
 
@@ -108,7 +104,7 @@ INT32 getBlockLumi(PTYPE *pAvgLumiBuff, INT32 *blkLumiBuff, INT32 width, INT32 h
 			blkLumiBuff[blkOffset] = (blkLumiBuff[blkOffset]>>2)<<2; //gain clip into 10bits, 20160326
 			if((param->sw_wdr_bavg_clip)&0x1)
 				blkLumiBuff[blkOffset] = CLIP(blkLumiBuff[blkOffset], noiseRatio,0xffffffff);
-      if(((param->sw_wdr_bavg_clip)&0x2)>>1)
+            if(((param->sw_wdr_bavg_clip)&0x2)>>1)
 				blkLumiBuff[blkOffset] = CLIP(blkLumiBuff[blkOffset], 0x0, bestLight);
 			LOGD("%d ",blkLumiBuff[blkOffset]);
 		}
@@ -145,6 +141,7 @@ INT32 blockCenterIndexUL(INT32 x, INT32 blkCenter, INT32 blkRadius)
 		blkIndex = -(blkRadius+1);
 	else
 	{
+	    //TONE_WEIGHT_FIXPOINT_BITS = 9
 		blkSizeOffset = blkSizeOffset>>TONE_WEIGHT_FIXPOINT_BITS;
 		blkIndex = (blkSizeOffset<<TONE_WEIGHT_FIXPOINT_BITS) + blkCenter;
 	}
@@ -154,7 +151,9 @@ INT32 blockCenterIndexUL(INT32 x, INT32 blkCenter, INT32 blkRadius)
 	return blkIndex;
 }
 
-INT32 toneMapping(PTYPE **ppChannelBuff, INT32 *blkLumiMeanBuff, PTYPE *pLmLpBuff, INT32 width, INT32 height, INT32 bitdepth, WDR_PARAMETER *param, INT8 blkWidth, INT8 blkHeight)
+INT32 toneMapping(PTYPE **ppChannelBuff, INT32 *blkLumiMeanBuff,
+            PTYPE *pLmLpBuff, INT32 width, INT32 height, INT32 bitdepth,
+                                WDR_PARAMETER *param, INT8 blkWidth, INT8 blkHeight)
 {
 	INT32 x, y, offset;
 	INT32 row, col;
@@ -162,25 +161,25 @@ INT32 toneMapping(PTYPE **ppChannelBuff, INT32 *blkLumiMeanBuff, PTYPE *pLmLpBuf
 	INT32 channelOR, channelOG, channelOB;
 	INT32 gainOffset1, gainOffset2;
 	INT32 gain;
-	LONG oldGain;
-	INT32 rgbOffset = param->sw_rgbOffset;
+	LONG  oldGain;
+	INT32 rgbOffset = param->sw_rgbOffset;//0
 	//INT32 bitdepth = param->sw_img_depth;
 	FILE *fp = NULL;
 
 	INT32 blkRadius, blkCenter;
 	INT32 blkIndexUY, blkIndexLX, blkIndexDY, blkIndexRX;
 	INT32 blkDWeightX, blkDWeightY;
-	LONG blkDWeightUL, blkDWeightUR, blkDWeightDL, blkDWeightDR;//64bit
+	LONG  blkDWeightUL, blkDWeightUR, blkDWeightDL, blkDWeightDR;//64bit
 	INT32 blkLumiUL, blkLumiUR, blkLumiDL, blkLumiDR;
 	INT32 blkMapUL, blkMapUR, blkMapDL, blkMapDR;
 	INT32 gainMax = ((param->sw_wdr_gain_max)>>10)<<10; //update, 20160407
 	PTYPE lpLumi;
-	INT8 inFixBits;
+	INT8  inFixBits;
 	//blkHeight = param->sw_block_height;
 	//blkWidth = param->sw_block_width;
-	inFixBits = 2;
-	gainOffset1 = param->sw_wdr_gain_off1;
-	gainOffset2 = param->sw_wdr_gain_off2;
+	inFixBits   = 2;
+	gainOffset1 = param->sw_wdr_gain_off1;//0
+	gainOffset2 = param->sw_wdr_gain_off2;//410
 
 	blkRadius = TONE_MAP_BLK_SIZE; //blockSize/2 = 256/2
 	blkCenter = (TONE_MAP_BLK_SIZE>>1)-1 + (TONE_MAP_BLK_SIZE>>1); //xCenter,yCenter = TONE_RADIUS_FIXPOINT_FACTOR( (blkRadius-1 + blkRadius)/2 )
@@ -196,8 +195,8 @@ INT32 toneMapping(PTYPE **ppChannelBuff, INT32 *blkLumiMeanBuff, PTYPE *pLmLpBuf
             channelB = ppChannelBuff[CHANNEL_BCr][offset];
 			lpLumi = pLmLpBuff[offset] >> inFixBits; //from 14bit in gaussian pyramid to 12bit
 
-			row = TONE_RADIUS_FIXPOINT_FACTOR(y);
-			col = TONE_RADIUS_FIXPOINT_FACTOR(x);
+			row = TONE_RADIUS_FIXPOINT_FACTOR(y);   //y*256
+			col = TONE_RADIUS_FIXPOINT_FACTOR(x);   //x*256
 			
 			// block center coordinates
 			blkIndexUY = blockCenterIndexUL(row, blkCenter, blkRadius);
@@ -209,7 +208,7 @@ INT32 toneMapping(PTYPE **ppChannelBuff, INT32 *blkLumiMeanBuff, PTYPE *pLmLpBuf
 			blkDWeightY = row - blkIndexUY; //distance from upleft = y(or x) - blockCenter_upleft
 			blkDWeightX = col - blkIndexLX;
 
-		  //calculate weight factors of these four blocks (8bit * 8bit)
+		    //calculate weight factors of these four blocks (8bit * 8bit)
 		    blkDWeightUL = (TONE_WEIGHT_FIXPOINT_FACTOR(1) - blkDWeightY)*(TONE_WEIGHT_FIXPOINT_FACTOR(1) - blkDWeightX);
 		    blkDWeightUR = (TONE_WEIGHT_FIXPOINT_FACTOR(1) - blkDWeightY)*(blkDWeightX);
 		    blkDWeightDL = (blkDWeightY)*(TONE_WEIGHT_FIXPOINT_FACTOR(1) - blkDWeightX);
@@ -254,12 +253,13 @@ INT32 toneMapping(PTYPE **ppChannelBuff, INT32 *blkLumiMeanBuff, PTYPE *pLmLpBuf
 }
 
 //return average Lumi
+//get the max chanel from RGB channel
 PTYPE getLumiChannel(PTYPE **ppChannelBuff, PTYPE *pRetLumiBuff, INT32 width, INT32 height)
 {
     INT32 x, y, offset;
     PTYPE channelR, channelG, channelB;
     UINT32 avgL = 0;
-    UINT32 maxL = 0;
+    //UINT32 maxL = 0;
     for (y = 0; y < height; y++)
     {
         for (x = 0; x < width; x++)
@@ -271,8 +271,8 @@ PTYPE getLumiChannel(PTYPE **ppChannelBuff, PTYPE *pRetLumiBuff, INT32 width, IN
 
             pRetLumiBuff[offset] = MAX(MAX(channelR, channelG), channelB);
             avgL += pRetLumiBuff[offset];
-            if(maxL < pRetLumiBuff[offset])
-                maxL = pRetLumiBuff[offset];
+            //if(maxL < pRetLumiBuff[offset])
+                //maxL = pRetLumiBuff[offset];
         }
     }
     avgL = avgL/(width*height);

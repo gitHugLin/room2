@@ -10,14 +10,15 @@ INT32 initNonlinearCurve(NONLINEAR_CURVE *pCurve, WDR_PARAMETER *param)
 {
 	UINT32 y16;
 	FILE *fp = NULL;
-	fp = fopen((char *)param->sw_nonlinearlut_name, "rb");
+	fp = fopen(param->sw_nonlinearlut_name, "rb");
 	if(NULL == fp) {
 	    LOGE("initNonlinearCurve Error : Can not open %s file!\n",param->sw_nonlinearlut_name);
 	    return -1;
 	}
 
+    //NONLIN_SEG_COUNT 16
 	fread(pCurve->dxBitDepth, sizeof(INT8), NONLIN_SEG_COUNT, fp);
-	fread(pCurve->y, sizeof(INT32), NONLIN_SEG_COUNT+1, fp);
+	fread(pCurve->y, sizeof(INT32), NONLIN_SEG_COUNT + 1, fp);
 	y16 = pCurve->y[16];
 	if((y16&0xf00)==0xf00) 
 	{
@@ -37,6 +38,7 @@ INT32 nonlinearCurveLut(NONLINEAR_CURVE *pCurve, PTYPE lumiVal, INT32 bitdepth)
 	INT32 cumYLeft, cumYRight;
 	INT32 newLumi = 0;
 	INT8 i;
+	//NONLIN_SEG_COUNT 16
 	for(i = 0; i < NONLIN_SEG_COUNT; i++)
 	{	
 		xDeltN = 1<<pCurve->dxBitDepth[i];
@@ -47,7 +49,7 @@ INT32 nonlinearCurveLut(NONLINEAR_CURVE *pCurve, PTYPE lumiVal, INT32 bitdepth)
 			cumYRight = pCurve->y[i+1];
 			interpWeight = cumXVal - lumiVal;
 			newLumi = interpWeight*cumYLeft + (xDeltN - interpWeight)*cumYRight;
-	        newLumi =FIXPOINT_REVERT(newLumi, pCurve->dxBitDepth[i]);
+	        newLumi = FIXPOINT_REVERT(newLumi, pCurve->dxBitDepth[i]);
 			newLumi = newLumi>>2;
 			newLumi = newLumi<<2;//12bits in&&10bits out round gamma
 			break;
@@ -57,7 +59,8 @@ INT32 nonlinearCurveLut(NONLINEAR_CURVE *pCurve, PTYPE lumiVal, INT32 bitdepth)
 }
 
 
-INT32 nonlinearCurveTransfer(PTYPE *pLumiChannelBuff, INT32 width, INT32 height, INT32 bitdepth, NONLINEAR_CURVE *pCurve)
+INT32 nonlinearCurveTransfer(PTYPE *pLumiChannelBuff, INT32 width,
+                INT32 height, INT32 bitdepth, NONLINEAR_CURVE *pCurve)
 {
 	INT32 x, y,offset;
 	INT32 lumi;

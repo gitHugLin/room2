@@ -1,7 +1,13 @@
 #ifndef __FILEPARSER_H__
 #define __FILEPARSER_H__
 #include "include/dataType.h"
+#include "iostream"
+#include "vector"
+#include "string"
+#include "opencv2/opencv.hpp"
 
+using namespace cv;
+using namespace std;
 
 
 typedef struct _BITMAP_FILE_HEADER
@@ -41,6 +47,9 @@ typedef union _RGBTAB
     RGBQUAD quad;
     UINT32  val;
 }RGBTAB;
+
+INT32 readRgbFile(PTYPE *pDataBuffB,PTYPE *pDataBuffG,PTYPE *pDataBuffR,
+                    INT32 pWidth, INT32 pHeight, INT32 depth, INT8 *pInFileName);
 
 INT32 readHeaderBmp(INT8 *pInFileName, INT32 *pWidth, INT32 *pHeight, INT32 *nChannel);
 

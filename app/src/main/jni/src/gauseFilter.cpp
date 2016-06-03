@@ -17,15 +17,11 @@ INT32 genHwGauseKernel( INT32 level, INT32 *pFilterFactor, INT32 rows, INT32 col
     INT32 cumVal = 0;
 
     LOGI("GauseKernel L%d, shift bits: ", scale);
-    for (y = -ry; y <= ry; y++)
-    {
-        for (x = -rx; x <= rx; x++)
-        {
+    for (y = -ry; y <= ry; y++) {
+        for (x = -rx; x <= rx; x++) {
             val = 4*(abs(x)+abs(y))/scale;
-
             //right shift bits:
             *(pFilterFactor + (y+ry)*cols + x+rx) = val;
-
             cumVal += GAUSE_FACTOR_FIXPOINT_FACTOR(1)>>val;
             //zty: LOGI("  %d, ", val);
         }
@@ -34,11 +30,21 @@ INT32 genHwGauseKernel( INT32 level, INT32 *pFilterFactor, INT32 rows, INT32 col
     
     //normilize scale factor, to make sum(gause_kernel)=1
     //zty: normFactor = GAUSE_NORM_FIXPOINT_FACTOR(GAUSE_FACTOR_FIXPOINT_FACTOR(1))/cumVal;
-    if(level ==0) {normFactor = GAUSE_NORM_FIXPOINT_FACTOR0(GAUSE_FACTOR_FIXPOINT_FACTOR(1))/cumVal;} //1//(1<<17<<5) div sum_coe0
-    else if(level ==1) {normFactor = GAUSE_NORM_FIXPOINT_FACTOR1(GAUSE_FACTOR_FIXPOINT_FACTOR(1))/cumVal;} //1//(1<<18<<5) div sum_coe1
-    else if(level ==2) {normFactor = GAUSE_NORM_FIXPOINT_FACTOR2(GAUSE_FACTOR_FIXPOINT_FACTOR(1))/cumVal;} //1//(1<<19<<5) div sum_coe2
-    else if(level ==3) {normFactor = GAUSE_NORM_FIXPOINT_FACTOR3(GAUSE_FACTOR_FIXPOINT_FACTOR(1))/cumVal;} //1//(1<<20<<5) div sum_coe3
-    else  { LOGE("normFactor, Level range out of 0~3, Error!!!");}
+    if(level ==0) {
+        normFactor = GAUSE_NORM_FIXPOINT_FACTOR0(GAUSE_FACTOR_FIXPOINT_FACTOR(1))/cumVal;
+    } //1//(1<<17<<5) div sum_coe0
+    else if(level ==1) {
+        normFactor = GAUSE_NORM_FIXPOINT_FACTOR1(GAUSE_FACTOR_FIXPOINT_FACTOR(1))/cumVal;
+    } //1//(1<<18<<5) div sum_coe1
+    else if(level ==2) {
+        normFactor = GAUSE_NORM_FIXPOINT_FACTOR2(GAUSE_FACTOR_FIXPOINT_FACTOR(1))/cumVal;
+    } //1//(1<<19<<5) div sum_coe2
+    else if(level ==3) {
+        normFactor = GAUSE_NORM_FIXPOINT_FACTOR3(GAUSE_FACTOR_FIXPOINT_FACTOR(1))/cumVal;
+    } //1//(1<<20<<5) div sum_coe3
+    else {
+        LOGE("normFactor, Level range out of 0~3, Error!!!");
+    }
     LOGI(" normFactor_fixed = %d \n", normFactor);
     return normFactor;
 }
@@ -47,9 +53,14 @@ INT32 initGausePyramidKernels(GAUSE_PYRAMID_KERNELS *pKernels, WDR_PARAMETER *pa
 {
     INT32 level;
     INT32 cols;
-    INT32 rows = param->sw_pyramid_kernel_rows;    
+    INT32 rows = param->sw_pyramid_kernel_rows;    //G_wdr_para.sw_pyramid_kernel_rows = 5;
     pKernels->heightClipped = rows;
-	
+	//PYRAMID_LEVELS = 4
+	//G_wdr_para.sw_pyramid_kernel_scales[0] = 5;
+    //G_wdr_para.sw_pyramid_kernel_scales[1] = 8;
+    //G_wdr_para.sw_pyramid_kernel_scales[2] = 13;
+    //G_wdr_para.sw_pyramid_kernel_scales[3] = 20;
+
     for(level = 0; level < PYRAMID_LEVELS; level++)
     {
         cols = param->sw_pyramid_kernel_scales[level]*2+1;
@@ -66,8 +77,8 @@ INT32 initGausePyramidKernels(GAUSE_PYRAMID_KERNELS *pKernels, WDR_PARAMETER *pa
 #endif
     }
 
-    pKernels->epsilon  = param->sw_pyramid_epsilon;
-    pKernels->pym_cc   = param->sw_pym_cc;
+    pKernels->epsilon  = param->sw_pyramid_epsilon;   //25
+    pKernels->pym_cc   = param->sw_pym_cc;            //3
     return 0;
 }
 
@@ -82,7 +93,9 @@ INT32 destroyGausePyramidKernels(GAUSE_PYRAMID_KERNELS *pKernels)
 }
 
 //pSrcBuf[x-dx:x+dx][y-dy:y+dy] * FltKernel, outputDepth = inputDepth + outFixBits
-PTYPE gauseFilter(INT32 level, PTYPE *pSrcBuf, INT32 width, INT32 height, INT32 x, INT32 y, INT32 *pFltKernelTab, INT32 kerWidth, INT32 kerHeight, INT32 kerNorm, INT32 outFixBits)
+PTYPE gauseFilter(INT32 level, PTYPE *pSrcBuf, INT32 width,
+        INT32 height, INT32 x, INT32 y, INT32 *pFltKernelTab, INT32 kerWidth,
+                INT32 kerHeight, INT32 kerNorm, INT32 outFixBits)
 {
     INT32 m, n, cnt,fac,shiftBits;
     INT32 row, col;
@@ -119,7 +132,8 @@ PTYPE gauseFilter(INT32 level, PTYPE *pSrcBuf, INT32 width, INT32 height, INT32 
 }
 
 //outputDepth = inputDepth + outFixBits
-INT32 gausePyramidFilter(PTYPE *pSrcBuf, PTYPE *pDstBuf, INT32 width, INT32 height, GAUSE_PYRAMID_KERNELS *pKernels,WDR_PARAMETER *param, INT32 outFixBits)
+INT32 gausePyramidFilter(PTYPE *pSrcBuf, PTYPE *pDstBuf, INT32 width,
+                INT32 height, GAUSE_PYRAMID_KERNELS *pKernels,WDR_PARAMETER *param, INT32 outFixBits)
 {
     INT32 x, y, lev,cmpVaule1,cmpValue2;
 	INT8 levelDisEn, i;
@@ -137,7 +151,8 @@ INT32 gausePyramidFilter(PTYPE *pSrcBuf, PTYPE *pDstBuf, INT32 width, INT32 heig
         {
             dstScale = PYRAMID_LEVELS-1;
 
-            fltVal = gauseFilter(0, pSrcBuf,  width, height, x, y, pKernels->factors[0], pKernels->width[0], pKernels->heightClipped, pKernels->normFactor[0], outFixBits);
+            fltVal = gauseFilter(0, pSrcBuf,  width, height, x, y, pKernels->factors[0],
+                    pKernels->width[0], pKernels->heightClipped, pKernels->normFactor[0], outFixBits);
 
             #ifdef  WDR_LOAD_DATA_EN  
                 LOGD("offset=%d(x=%d,y=%d): fltVal0=0x%x,",(y*width+x),x,y,fltVal); 
@@ -146,7 +161,10 @@ INT32 gausePyramidFilter(PTYPE *pSrcBuf, PTYPE *pDstBuf, INT32 width, INT32 heig
             for(lev = 1; lev <= PYRAMID_LEVELS; lev++)//lev:\u4e0b\u4e00\u5c42\u6807\u53f7
             {
                 if(lev != PYRAMID_LEVELS)
-                    fltVal2 = gauseFilter(lev, pSrcBuf,  width, height, x, y, pKernels->factors[lev], pKernels->width[lev], pKernels->heightClipped, pKernels->normFactor[lev], outFixBits);//\u4e0b\u4e00\u5c42\u7684\u503c
+                    fltVal2 = gauseFilter(lev, pSrcBuf,  width, height, x, y,
+                        pKernels->factors[lev], pKernels->width[lev],
+                            pKernels->heightClipped, pKernels->normFactor[lev], outFixBits);
+                            //\u4e0b\u4e00\u5c42\u7684\u503c
                 #ifdef  WDR_LOAD_DATA_EN  
                     LOGD("fltVal=0x%x,",fltVal2); 
                 #endif

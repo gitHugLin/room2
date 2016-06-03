@@ -18,7 +18,7 @@
 #define     IMAGE_FILE_INPUT_PATH         "./"
 #define     LUT_FILE_INPUT_PATH           "./lut/"
 #define     NONLINEAR_FILE_INPUT_PATH     "./lut/"
-#define     IMAGE_FILE_INPUT_NAME         "/sdcard/wdr_dat_in"
+#define     IMAGE_FILE_INPUT_NAME         "/sdcard/wdr_raw"
 #define     IMAGE_FILE_OUTPUT_NAME        "/sdcard/wdr_cmodel_out"
 #define     IMAGE_FILE_LUT_NAME0          "/sdcard/toneCurveLutG1.0.dat"
 #define     IMAGE_FILE_LUT_NAME1          "/sdcard/toneCurveLutS1.0.dat"
@@ -58,14 +58,14 @@ typedef struct _WDR_PARAMETER
     UINT16  sw_pym_cc    ; //hpz add for gaussian pyramid level compare 
     
     //tone curve
-    UINT8   sw_lutfile_name[MAX_FILENAME_LEN];
+    INT8    sw_lutfile_name[MAX_FILENAME_LEN];
     UINT8   sw_tonecurve_deltxbit[TONE_CURVE_SEG_COUNT];
     UINT32  sw_tonecurve_y[TONE_CURVE_SEG_COUNT];
     UINT32  sw_tonecurve_xBits; //bitdepth for sum(dx)
     UINT32  sw_tonecurve_dxBits;    //bitdepth for min(dx)
 
 	//RGB to Y (2nd version on 20160305)
-	UINT8 sw_wdr_csc_sel; //1:rgb_avg; 0: rgb_max
+	UINT8  sw_wdr_csc_sel; //1:rgb_avg; 0: rgb_max
 	UINT32 sw_wdr_coe_00; //channel R
 	UINT32 sw_wdr_coe_01; //channel G
 	UINT32 sw_wdr_coe_02; //channel B
@@ -83,7 +83,7 @@ typedef struct _WDR_PARAMETER
 	UINT8 sw_wdr_nonl_segm; //0: divided equally(interval 2^8)  1: divided unequally
 	UINT8 sw_wdr_nonl_open; //0: linear to nonlinear off  1: linear to nonlinear on
 	//UINT8 sw_nonlinearlut_name[MAX_FILENAME_LEN];
-	UINT8 sw_nonlinearlut_name[MAX_FILENAME_LEN];
+	INT8 sw_nonlinearlut_name[MAX_FILENAME_LEN];
 
 	//wdr mode option
 	UINT8 sw_wdr_blk_sel; //0:rk-global wdr  1: rk-block wdr
@@ -94,17 +94,17 @@ typedef struct _WDR_PARAMETER
 	UINT8 sw_wdr_lvl_i_en[4];
 	
 	//confine block mean luminance value
-	UINT8 sw_wdr_bavg_clip;
+	UINT8  sw_wdr_bavg_clip;
 	UINT32 sw_wdr_bestlight;
 	UINT32 sw_wdr_noiseratio;
 	//
 	UINT32 sw_wdr_gain_max;
-	UINT8 sw_wdr_gain_max_en;
+	UINT8  sw_wdr_gain_max_en;
 
 }WDR_PARAMETER;
 
 
-void initWdrPara(WDR_PARAMETER G_wdr_para , INT8 *frmnumStr);
+void initWdrPara(WDR_PARAMETER &G_wdr_para , INT8 *frmnumStr);
 
 
 #endif

@@ -2,16 +2,16 @@
 //
 // Created by linqi on 16-5-30.
 //
-void initWdrPara(WDR_PARAMETER G_wdr_para, INT8 *frmnumStr0 )
+void initWdrPara(WDR_PARAMETER &G_wdr_para, char *frmnumStr0 )
 {
 
-    G_wdr_para.sw_img_width                = 1920;
-    G_wdr_para.sw_img_height               = 1080;
+    G_wdr_para.sw_img_width                = 2104; //1920;
+    G_wdr_para.sw_img_height               = 1560; //1080;
     G_wdr_para.sw_rgbOffset                = 0;
     G_wdr_para.sw_gainOffset               = 1;
-    G_wdr_para.sw_pyramid_epsilon = 25;
-    G_wdr_para.sw_rkwdr_ctrl = 1;
-    G_wdr_para.sw_tonemap_lut = 1;
+    G_wdr_para.sw_pyramid_epsilon          = 25;
+    G_wdr_para.sw_rkwdr_ctrl               = 1;
+    G_wdr_para.sw_tonemap_lut              = 1;
     G_wdr_para.sw_pym_cc                   = 0x3    ;
 
     //RGB to Y (2nd version on 20160305)
@@ -23,7 +23,7 @@ void initWdrPara(WDR_PARAMETER G_wdr_para, INT8 *frmnumStr0 )
     G_wdr_para.sw_wdr_gain_off1            = 0      ;
     G_wdr_para.sw_wdr_gain_off2            = 410    ;
 
-    G_wdr_para.sw_wdr_blk_sel = 1;
+    G_wdr_para.sw_wdr_blk_sel              = 1;
     G_wdr_para.sw_wdr_flt_sel              = 1      ; // 1: gaussian pyramid on  0: gaussian pyramid off
     //G_wdr_para.sw_wdr_nonl_mode0           = 1      ; // lpL for gaussian pyramid 1: linear 0:nonlinear //delete already
     G_wdr_para.sw_wdr_nonl_mode1           = 0      ; // Y for tonemap 1:linear  0:nonlinear
@@ -47,10 +47,10 @@ void initWdrPara(WDR_PARAMETER G_wdr_para, INT8 *frmnumStr0 )
     strcpy(G_wdr_para.sw_outfile_name, IMAGE_FILE_OUTPUT_NAME);
     strcpy(G_wdr_para.sw_infile_name,  IMAGE_FILE_INPUT_NAME );
 
-    strcat(G_wdr_para.sw_outfile_name, (char *)frmnumStr0);
-    strcat(G_wdr_para.sw_infile_name,  (char *)frmnumStr0);
+    //strcat(G_wdr_para.sw_outfile_name, (char *)frmnumStr0);
+    //strcat(G_wdr_para.sw_infile_name,  (char *)frmnumStr0);
     strcat(G_wdr_para.sw_outfile_name, ".dat");
-    strcat(G_wdr_para.sw_infile_name,  ".dat");
+    strcat(G_wdr_para.sw_infile_name,  ".pgm");
 
     //G_wdr_para.sw_img_width  = 64; //2104/2;
     //G_wdr_para.sw_img_height = 32; //1560/2;
@@ -63,29 +63,23 @@ void initWdrPara(WDR_PARAMETER G_wdr_para, INT8 *frmnumStr0 )
     G_wdr_para.sw_pyramid_kernel_scales[3] = PYRAMID_LEVEL3_MAXSCALE;
     G_wdr_para.sw_pyramid_kernel_rows = 5;
 
-/*
-G_wdr_para.sw_pyramid_factors_l0[5][PYRAMID_LEVEL0_MAXSCALE*2+1];
-G_wdr_para.sw_pyramid_factors_l1[5][PYRAMID_LEVEL1_MAXSCALE*2+1];
-G_wdr_para.sw_pyramid_factors_l2[5][PYRAMID_LEVEL2_MAXSCALE*2+1];
-G_wdr_para.sw_pyramid_factors_l3[5][PYRAMID_LEVEL3_MAXSCALE*2+1];
-*/
 
-//diff between levels, default 0.05-0.1
-//strcpy(G_wdr_para.sw_lutfile_name, IMAGE_FILE_LUT_NAME);
+    //LUT（Look-up table）颜色查找表
+    //diff between levels, default 0.05-0.1
+    //strcpy(G_wdr_para.sw_lutfile_name, IMAGE_FILE_LUT_NAME);
     switch(G_wdr_para.sw_tonemap_lut) {
-        case 0: strcpy((char *)G_wdr_para.sw_lutfile_name, IMAGE_FILE_LUT_NAME0); break;
-        case 1: strcpy((char *)G_wdr_para.sw_lutfile_name, IMAGE_FILE_LUT_NAME1); break;
-        case 2: strcpy((char *)G_wdr_para.sw_lutfile_name, IMAGE_FILE_LUT_NAME2); break;
-        case 3: strcpy((char *)G_wdr_para.sw_lutfile_name, IMAGE_FILE_LUT_NAME3); break;
+        case 0: strcpy(G_wdr_para.sw_lutfile_name, IMAGE_FILE_LUT_NAME0); break;
+        case 1: strcpy(G_wdr_para.sw_lutfile_name, IMAGE_FILE_LUT_NAME1); break;
+        case 2: strcpy(G_wdr_para.sw_lutfile_name, IMAGE_FILE_LUT_NAME2); break;
+        case 3: strcpy(G_wdr_para.sw_lutfile_name, IMAGE_FILE_LUT_NAME3); break;
         default: LOGD("->sw_tonemap_lut=%d out of range, be careful!\n",G_wdr_para.sw_tonemap_lut);
     }
 
     switch(G_wdr_para.sw_wdr_nonl_segm) {
-        case 0: strcpy((char *)G_wdr_para.sw_nonlinearlut_name, IMAGE_FILE_NONLINEAR_NAME1);break;
-	    case 1: strcpy((char *)G_wdr_para.sw_nonlinearlut_name, IMAGE_FILE_NONLINEAR_NAME0);break;
+        case 0: strcpy(G_wdr_para.sw_nonlinearlut_name, IMAGE_FILE_NONLINEAR_NAME1);break;
+	    case 1: strcpy(G_wdr_para.sw_nonlinearlut_name, IMAGE_FILE_NONLINEAR_NAME0);break;
 	    default: LOGD("->sw_nonlinear_lut=%d out of range, be careful!\n",G_wdr_para.sw_wdr_nonl_segm);
     }
-
     //sw_tonecurve_deltxbit[TONE_CURVE_SEG_COUNT];
     //sw_tonecurve_y[TONE_CURVE_SEG_COUNT];
     G_wdr_para.sw_tonecurve_xBits  = 12;

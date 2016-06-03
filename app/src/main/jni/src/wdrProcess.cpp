@@ -1,5 +1,24 @@
 #include "include/wdrProcess.h"
 
+static double work_begin = 0;
+static double work_end = 0;
+static double gTime = 0;
+//开始计时
+static void workEnd(char *tag = "TimeCounts" );
+static void workBegin();
+static void workBegin()
+{
+    work_begin = getTickCount();
+}
+//结束计时
+static void workEnd(char *tag)
+{
+    work_end = getTickCount() - work_begin;
+    gTime = work_end /((double)getTickFrequency() )* 1000.0;
+    LOGE("[TAG: %s ]:TIME = %lf ms \n",tag,gTime);
+}
+
+
 WDR_PARAMETER G_wdr_para;
 
 INT32 frameFlag = 0;
@@ -21,6 +40,7 @@ INT32 frameProc()
 	INT8 blkHeight;
 	INT8 blkWidth;
 
+    //CHANNEL_INDEX_COUNT = 4
     INT32 widthBuf[CHANNEL_INDEX_COUNT];        //reserved for yuv420
     INT32 heightBuf[CHANNEL_INDEX_COUNT];       //reserved for yuv420
     PTYPE *ppChannelBuff[CHANNEL_INDEX_COUNT];  //Image data with RGB channels
@@ -53,10 +73,11 @@ INT32 frameProc()
         heightBuf[channelIndex] = height;
     }
 
-    MALLOC(pLumiBuff, PTYPE, width * height); //maxlumiMode buffer
+    MALLOC(pLumiBuff, PTYPE, width * height);    //maxlumiMode buffer
 	//2nd version on 20160311
-	MALLOC(pAvgLumiBuff, PTYPE, width * height);//avglumi buffer
+	MALLOC(pAvgLumiBuff, PTYPE, width * height); //avglumi buffer
 
+    //TONE_MAP_BLK_SIZEBITS = 8
 	blkWidth = width >> TONE_MAP_BLK_SIZEBITS;
 	blkHeight = height >> TONE_MAP_BLK_SIZEBITS;
 	if (width - (blkWidth << TONE_MAP_BLK_SIZEBITS) > 0)
@@ -66,7 +87,7 @@ INT32 frameProc()
 
 	MALLOC(blkLumiBuff, INT32, blkWidth * blkHeight);//block means lumi buffer(2nd version on 20160308)
 	MALLOC(lineLumiBuff, INT32, height * blkWidth);
-	//
+
     MALLOC(pLmLpBuff, PTYPE, width * height);      
 
     //load image file
@@ -77,14 +98,7 @@ INT32 frameProc()
                     ppChannelBuff,
                     pInFileName,
                     IO_FILE_FORMAT_ASCII_48BIT_PER_LINE);
-    //convert input .pgm img to .dat
-    /*dumpChannelData(format,
-        widthBuf,
-        heightBuf,
-        widthBuf,
-        ppChannelBuff,
-        pOutFileName,
-        IO_FILE_FORMAT_ASCII_48BIT_PER_LINE);*/
+
 
     dumpPixelsDataToBmpFile(format,
         widthBuf,
@@ -94,10 +108,11 @@ INT32 frameProc()
         pInFileName,
         NULL,
         0);
-LOGE("frameProc : frameProc is running! 333333333333333333\n");
+workBegin();
 	/************************************Luminance linear to nonlinear*************************************/
 	initNonlinearCurve(&nonlCurve, &G_wdr_para);
-	LOGE("frameProc : frameProc is running! 5555555555555555555555\n");
+
+    //get Y chanel
 	avgL = getAvgLumiChannel(ppChannelBuff, pAvgLumiBuff, &G_wdr_para, width, height); 
 
   	if (((G_wdr_para.sw_wdr_nonl_mode1)&0x1)==0x0 && ((G_wdr_para.sw_wdr_nonl_open)&0x1)==0x1)
@@ -106,10 +121,11 @@ LOGE("frameProc : frameProc is running! 333333333333333333\n");
 	}
 	else
 		LOGE("Error in opening nonlinear transfer!\n");
-//	}
+
 	LOGE("frameProc : frameProc is running! 4444444444444444444444444\n");
 	if (G_wdr_para.sw_wdr_csc_sel == 0)
 	{
+	    //get the max chanel from RGB channel
 		L = getLumiChannel(ppChannelBuff, pLumiBuff, width, height); //lumiMode0(Max mode)
 
 	}
@@ -123,14 +139,17 @@ LOGE("frameProc : frameProc is running! 333333333333333333\n");
 
 /***************************************** Gaussian Pyramid *************************************/
     //get low-pass filter output, LUMI_FIXPOINT_BITS
-	if(G_wdr_para.sw_wdr_flt_sel == 0x1) // gaussian pyramid 
+	if(G_wdr_para.sw_wdr_flt_sel == 0x0) // gaussian pyramid
 	{
+//workBegin();
+	    //run here
 		memset(&gKernels, 0, sizeof(gKernels));
 		initGausePyramidKernels(&gKernels, &G_wdr_para);
 		gausePyramidFilter(pLumiBuff, pLmLpBuff, width, height, &gKernels, &G_wdr_para, LUMI_FIXPOINT_BITS);
 		destroyGausePyramidKernels(&gKernels);
+//workEnd("WDR TIME COUNT");
 	}
-	else if (G_wdr_para.sw_wdr_flt_sel == 0)
+	else if (G_wdr_para.sw_wdr_flt_sel == 0x1)
 	{
 		lumiFixpoints(pLumiBuff, pLmLpBuff, width, height, LUMI_FIXPOINT_BITS); //bitdepth 12 bit + 2
 	}
@@ -142,6 +161,7 @@ LOGE("frameProc : frameProc is running! 333333333333333333\n");
 	/************************************** WDR tone mapping ********************************/
 	if(G_wdr_para.sw_wdr_blk_sel == 0)  //global method
 	{   //for next frame with sw_wdr_blk_sel=1
+
  	    getBlockLumi(pAvgLumiBuff, blkLumiBuff, width, height,blkWidth, blkHeight, &G_wdr_para );//get 5x8 block mean
 		renameDatFile(newOutputFileName, "lastBlockLumi1Data");
 		fp1 = fopen(newOutputFileName, "wb");
@@ -156,9 +176,9 @@ LOGE("frameProc : frameProc is running! 333333333333333333\n");
 	else if(G_wdr_para.sw_wdr_blk_sel == 0x1) //local method (in block)
 	{
 		//tone mapping in block means
-
 		if (frameFlag == 0)
 		{
+		    //run here
 			getBlockLumi(pAvgLumiBuff, blkLumiBuff, width, height,blkWidth, blkHeight, &G_wdr_para );//get 5x8 block mean
 #ifdef LAST_FRAME_BASED
 			//if based on lumi of last frame
@@ -176,6 +196,7 @@ LOGE("frameProc : frameProc is running! 333333333333333333\n");
 			fclose(fp1);
 		}
 
+        //run here
 		bitdepth = toneMapping(ppChannelBuff, blkLumiBuff, pLmLpBuff, width, height, bitdepth, &G_wdr_para, blkWidth, blkHeight);
 #ifdef LAST_FRAME_BASED
 		if(frameFlag == 0x1) //frame num=2 used 
@@ -192,15 +213,7 @@ LOGE("frameProc : frameProc is running! 333333333333333333\n");
 
 	bitdepth -= LUMI_FIXPOINT_BITS; //14bit to 12bit
 
-	
-  //output result
-  dumpChannelData(format,
-      widthBuf,
-      heightBuf,
-      widthBuf,
-      ppChannelBuff,
-      pOutFileName,
-      IO_FILE_FORMAT_ASCII_48BIT_PER_LINE);
+workEnd("WDR TIME COUNT");
   dumpPixelsDataToBmpFile(format,
       widthBuf,
       heightBuf,
@@ -218,6 +231,7 @@ LOGE("frameProc : frameProc is running! 333333333333333333\n");
 	//2nd version on 20160311
   FREE(pAvgLumiBuff);
   FREE(blkLumiBuff);
+  LOGE("end of frame processing ! \n");
   return 0;
 }
 
@@ -231,7 +245,7 @@ LOGE("frameProc : frameProc is running! 333333333333333333\n");
 #define WDR_LOOP_EN
 //#define LAST_FRAME_BASED
 #define FAMENUM  0x1
-INT8  frmnumStr0[2];
+char  frmnumStr0[2];
 
 #ifdef WDR_LOOP_EN
     INT32 wdrProcess()
@@ -254,10 +268,11 @@ INT8  frmnumStr0[2];
           G_wdr_para.sw_wdr_lvl_i_en[2] = (G_wdr_para.sw_wdr_lvl_en&0x4)>>2;
           G_wdr_para.sw_wdr_lvl_i_en[3] = (G_wdr_para.sw_wdr_lvl_en&0x8)>>3; 
           G_wdr_para.sw_wdr_flt_sel     = 1    ; // 1: gaussian pyramid on  0: gaussian pyramid off
+          initWdrPara(G_wdr_para,frmnumStr0);
 			switch(frameCount) { 
               case 0: 
               	    #if (FAMENUM > 0x0)
-                        initWdrPara(G_wdr_para,frmnumStr0);
+
                         break;
                     #endif
               case 1: 
