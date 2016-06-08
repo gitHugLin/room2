@@ -4,6 +4,30 @@
 #include "log.h"
 #include "include/toneMap.h"
 #include "include/nonlinearCurve.h"
+#include "opencv2/opencv.hpp"
+
+using namespace cv;
+using namespace std;
+
+
+static double work_begin = 0;
+static double work_end = 0;
+static double gTime = 0;
+//开始计时
+static void workEnd(char *tag = "TimeCounts" );
+static void workBegin();
+static void workBegin()
+{
+    work_begin = getTickCount();
+}
+//结束计时
+static void workEnd(char *tag)
+{
+    work_end = getTickCount() - work_begin;
+    gTime = work_end /((double)getTickFrequency() )* 1000.0;
+    LOGE("[TAG: %s ]:TIME = %lf ms \n",tag,gTime);
+}
+
 // turning lpLumi into 14 bits
 
 PTYPE lumiFixpoints(PTYPE *pLumiBuff, PTYPE *pLmLpBuff, INT32 width, INT32 height, INT32 outFixbits)
@@ -63,10 +87,11 @@ INT32 getBlockLumi(PTYPE *pAvgLumiBuff, INT32 *blkLumiBuff,
 	INT32 x, y, offset;
 	INT8 blkX, blkY, blkOffset;
 	INT32 xRest, yRest,curAvgLumiVal;
-	// G_wdr_para.sw_wdr_bestlight   = 0x0cf0
-    // G_wdr_para.sw_wdr_noiseratio  = 0x00c0
+	// G_wdr_para.sw_wdr_bestlight   = 0x0cf0//3321
+    // G_wdr_para.sw_wdr_noiseratio  = 0x00c0//192
 	INT32 noiseRatio = ((param->sw_wdr_noiseratio)>>4)<<4; //clip low 4bits, 20160330
 	INT32 bestLight  = ((param->sw_wdr_bestlight )>>4)<<4; //clip low 4bits, 20160330
+
 	//blkRow = height >> TONE_MAP_BLK_SIZEBITS;
 	//blkCol = width >> TONE_MAP_BLK_SIZEBITS;
 	xRest = (blkWidth << TONE_MAP_BLK_SIZEBITS) - width;
@@ -135,7 +160,7 @@ INT32 blockCenterIndexUL(INT32 x, INT32 blkCenter, INT32 blkRadius)
 	INT32 blkIndex;
 
 	//x = TONE_RADIUS_FIXPOINT_FACTOR(x);
-	blkSizeOffset = x - blkCenter;
+	blkSizeOffset = x - blkCenter;//blkCenter = 255
 
 	if (blkSizeOffset < 0)
 		blkIndex = -(blkRadius+1);
@@ -172,7 +197,7 @@ INT32 toneMapping(PTYPE **ppChannelBuff, INT32 *blkLumiMeanBuff,
 	LONG  blkDWeightUL, blkDWeightUR, blkDWeightDL, blkDWeightDR;//64bit
 	INT32 blkLumiUL, blkLumiUR, blkLumiDL, blkLumiDR;
 	INT32 blkMapUL, blkMapUR, blkMapDL, blkMapDR;
-	INT32 gainMax = ((param->sw_wdr_gain_max)>>10)<<10; //update, 20160407
+	INT32 gainMax = ((param->sw_wdr_gain_max)>>10)<<10; //sw_wdr_gain_max = 0xffff; gainMax = 60
 	PTYPE lpLumi;
 	INT8  inFixBits;
 	//blkHeight = param->sw_block_height;
@@ -181,22 +206,27 @@ INT32 toneMapping(PTYPE **ppChannelBuff, INT32 *blkLumiMeanBuff,
 	gainOffset1 = param->sw_wdr_gain_off1;//0
 	gainOffset2 = param->sw_wdr_gain_off2;//410
 
-	blkRadius = TONE_MAP_BLK_SIZE; //blockSize/2 = 256/2
+	blkRadius = TONE_MAP_BLK_SIZE; //256
 	blkCenter = (TONE_MAP_BLK_SIZE>>1)-1 + (TONE_MAP_BLK_SIZE>>1); //xCenter,yCenter = TONE_RADIUS_FIXPOINT_FACTOR( (blkRadius-1 + blkRadius)/2 )
 
+    int round = 0;
+    bool r = true;
 	//get coordinates of four adjacent blocks
+	workBegin();
 	for(y = 0; y < height; y++)
 	{
 		for(x = 0; x < width; x++)
 		{
+		if( y == 0)
+		workBegin();
 			offset = y * width + x;
 			channelR = ppChannelBuff[CHANNEL_RY][offset];
             channelG = ppChannelBuff[CHANNEL_GCb][offset];
             channelB = ppChannelBuff[CHANNEL_BCr][offset];
 			lpLumi = pLmLpBuff[offset] >> inFixBits; //from 14bit in gaussian pyramid to 12bit
 
-			row = TONE_RADIUS_FIXPOINT_FACTOR(y);   //y*256
-			col = TONE_RADIUS_FIXPOINT_FACTOR(x);   //x*256
+			row = TONE_RADIUS_FIXPOINT_FACTOR(y);   //y*2
+			col = TONE_RADIUS_FIXPOINT_FACTOR(x);   //x*2
 			
 			// block center coordinates
 			blkIndexUY = blockCenterIndexUL(row, blkCenter, blkRadius);
@@ -217,27 +247,28 @@ INT32 toneMapping(PTYPE **ppChannelBuff, INT32 *blkLumiMeanBuff,
 			// block index for finding out corresponding block lumi average
 			blkIndexUY = MAX(blkCenter, blkIndexUY) >> TONE_WEIGHT_FIXPOINT_BITS; //boundary clip to get average lumi of each block
 			blkIndexLX = MAX(blkCenter, blkIndexLX) >> TONE_WEIGHT_FIXPOINT_BITS;
-			blkIndexDY = MIN(((blkHeight<<TONE_WEIGHT_FIXPOINT_BITS)-blkCenter), blkIndexDY) >> TONE_WEIGHT_FIXPOINT_BITS;
-			blkIndexRX = MIN(((blkWidth<<TONE_WEIGHT_FIXPOINT_BITS)-blkCenter), blkIndexRX) >> TONE_WEIGHT_FIXPOINT_BITS;
+			blkIndexDY = MIN(((blkHeight<<TONE_WEIGHT_FIXPOINT_BITS) - blkCenter), blkIndexDY) >> TONE_WEIGHT_FIXPOINT_BITS;
+			blkIndexRX = MIN(((blkWidth<<TONE_WEIGHT_FIXPOINT_BITS) - blkCenter), blkIndexRX) >> TONE_WEIGHT_FIXPOINT_BITS;
 			
 			//get average luminance of each block( or use data from last frame)
-
+//workBegin();
 			blkLumiUL = blkLumiMeanBuff[blkIndexUY*blkWidth + blkIndexLX];
 			blkLumiUR = blkLumiMeanBuff[blkIndexUY*blkWidth + blkIndexRX];
 			blkLumiDL = blkLumiMeanBuff[blkIndexDY*blkWidth + blkIndexLX];
 			blkLumiDR = blkLumiMeanBuff[blkIndexDY*blkWidth + blkIndexRX];
-			
+//workEnd("blkLumiMeanBuff TIME COUNT");
 			//figure out gain = (1 + blkLumi*lpLumi + gainOffset1)/(blkLumi + lpLumi + gainOffset2)18bit
+//workBegin();
 			blkMapUL = blkMeansGain(blkLumiUL, lpLumi, gainOffset1, gainOffset2);
 			blkMapUR = blkMeansGain(blkLumiUR, lpLumi, gainOffset1, gainOffset2);
 			blkMapDL = blkMeansGain(blkLumiDL, lpLumi, gainOffset1, gainOffset2);
 			blkMapDR = blkMeansGain(blkLumiDR, lpLumi, gainOffset1, gainOffset2);
-
+//workEnd("blkMeansGain TIME COUNT");
 		    oldGain = ((blkDWeightUL*blkMapUL)>>18) + ((blkDWeightUR*blkMapUR)>>18) + ((blkDWeightDL*blkMapDL)>>18) + ((blkDWeightDR*blkMapDR)>>18);
 			gain = (INT32)oldGain;
-			if(param->sw_wdr_gain_max_en)
-				gain = MIN(gain, gainMax);
-		
+			//if(param->sw_wdr_gain_max_en)//sw_wdr_gain_max_en = 0
+				//gain = MIN(gain, gainMax);
+
 			//get current pixel's luminance after tone mapping
 			channelOR = MIN(FIXPOINT_REVERT((channelR+rgbOffset)*gain, TONE_GAIN_FIXPOINT_BITS), BIT_MASK(bitdepth-2));
             channelOG = MIN(FIXPOINT_REVERT((channelG+rgbOffset)*gain, TONE_GAIN_FIXPOINT_BITS), BIT_MASK(bitdepth-2));
@@ -245,9 +276,12 @@ INT32 toneMapping(PTYPE **ppChannelBuff, INT32 *blkLumiMeanBuff,
             ppChannelBuff[CHANNEL_RY][offset]  = channelOR;
             ppChannelBuff[CHANNEL_GCb][offset] = channelOG;
             ppChannelBuff[CHANNEL_BCr][offset] = channelOB;
-
+if( y == 0)
+workEnd("toneMapping TIME COUNT");
 		}
+
 	}
+
 
 	return bitdepth;
 }

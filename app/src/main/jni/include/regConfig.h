@@ -104,7 +104,7 @@ typedef struct _WDR_PARAMETER
 }WDR_PARAMETER;
 
 
-void initWdrPara(WDR_PARAMETER &G_wdr_para , INT8 *frmnumStr);
+void initWdrPara(WDR_PARAMETER &G_wdr_para);
 
 
 #endif

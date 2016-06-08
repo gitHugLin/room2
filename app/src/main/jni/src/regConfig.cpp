@@ -2,7 +2,7 @@
 //
 // Created by linqi on 16-5-30.
 //
-void initWdrPara(WDR_PARAMETER &G_wdr_para, char *frmnumStr0 )
+void initWdrPara(WDR_PARAMETER &G_wdr_para)
 {
 
     G_wdr_para.sw_img_width                = 2104; //1920;

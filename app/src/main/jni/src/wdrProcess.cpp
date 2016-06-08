@@ -108,30 +108,33 @@ INT32 frameProc()
         pInFileName,
         NULL,
         0);
-workBegin();
+
 	/************************************Luminance linear to nonlinear*************************************/
 	initNonlinearCurve(&nonlCurve, &G_wdr_para);
 
     //get Y chanel
+workBegin();
 	avgL = getAvgLumiChannel(ppChannelBuff, pAvgLumiBuff, &G_wdr_para, width, height); 
-
+workEnd("getAvgLumiChannel TIME COUNT");
+workBegin();
   	if (((G_wdr_para.sw_wdr_nonl_mode1)&0x1)==0x0 && ((G_wdr_para.sw_wdr_nonl_open)&0x1)==0x1)
 	{
 		nonlinearCurveTransfer(pAvgLumiBuff, width, height, bitdepth, &nonlCurve);
 	}
 	else
 		LOGE("Error in opening nonlinear transfer!\n");
+workEnd("initNonlinearCurve TIME COUNT");
+workBegin();
 
-	LOGE("frameProc : frameProc is running! 4444444444444444444444444\n");
 	if (G_wdr_para.sw_wdr_csc_sel == 0)
 	{
 	    //get the max chanel from RGB channel
 		L = getLumiChannel(ppChannelBuff, pLumiBuff, width, height); //lumiMode0(Max mode)
-
+		workEnd("getLumiChannel TIME COUNT");
 	}
 	else if (G_wdr_para.sw_wdr_csc_sel == 0x1)
 	{
-	// 2nd version on 20160311
+	    // 2nd version on 20160311
 		L = getAvgLumiChannel(ppChannelBuff, pLumiBuff, &G_wdr_para, width, height); //lumiMode1(average mode)
 	}
 	else
@@ -151,7 +154,9 @@ workBegin();
 	}
 	else if (G_wdr_para.sw_wdr_flt_sel == 0x1)
 	{
+	workBegin();
 		lumiFixpoints(pLumiBuff, pLmLpBuff, width, height, LUMI_FIXPOINT_BITS); //bitdepth 12 bit + 2
+	workEnd("lumiFixpoints TIME COUNT");
 	}
 	else
 		LOGE("Error in Gaussian pyramid building!\n");
@@ -178,8 +183,11 @@ workBegin();
 		//tone mapping in block means
 		if (frameFlag == 0)
 		{
+		workBegin();
 		    //run here
-			getBlockLumi(pAvgLumiBuff, blkLumiBuff, width, height,blkWidth, blkHeight, &G_wdr_para );//get 5x8 block mean
+			getBlockLumi(pAvgLumiBuff, blkLumiBuff, width, height,blkWidth, blkHeight, &G_wdr_para );
+			//get 5x8 block mean
+		workEnd("getBlockLumi TIME COUNT");
 #ifdef LAST_FRAME_BASED
 			//if based on lumi of last frame
 			renameDatFile(newOutputFileName, "lastBlockLumi1Data");
@@ -195,9 +203,11 @@ workBegin();
 			fread(blkLumiBuff, sizeof(INT32), blkHeight*blkWidth, fp1);//block lumi of last frame
 			fclose(fp1);
 		}
-
+workBegin();
         //run here
-		bitdepth = toneMapping(ppChannelBuff, blkLumiBuff, pLmLpBuff, width, height, bitdepth, &G_wdr_para, blkWidth, blkHeight);
+		bitdepth = toneMapping(ppChannelBuff, blkLumiBuff, pLmLpBuff, width,
+		        height, bitdepth, &G_wdr_para, blkWidth, blkHeight);
+workEnd("toneMapping TIME COUNT");
 #ifdef LAST_FRAME_BASED
 		if(frameFlag == 0x1) //frame num=2 used 
 		{
@@ -213,7 +223,7 @@ workBegin();
 
 	bitdepth -= LUMI_FIXPOINT_BITS; //14bit to 12bit
 
-workEnd("WDR TIME COUNT");
+//workEnd("WDR TIME COUNT");
   dumpPixelsDataToBmpFile(format,
       widthBuf,
       heightBuf,
@@ -235,107 +245,34 @@ workEnd("WDR TIME COUNT");
   return 0;
 }
 
-/****************************************************************/
-#ifdef WIN32
-#define CONFIG_PATH 
-#else
-#define CONFIG_PATH // "./c_lib/"
-#endif
 
-#define WDR_LOOP_EN
-//#define LAST_FRAME_BASED
-#define FAMENUM  0x1
-char  frmnumStr0[2];
+INT32 wdrProcess()
+{
+    LOGE("wdrProcess : wdrProcess is running!\n");
+	G_wdr_para.sw_wdr_lvl_en      = 0xf  ; //initial gaussian levelx4 enable
+    G_wdr_para.sw_wdr_lvl_i_en[0] = (G_wdr_para.sw_wdr_lvl_en&0x1)>>0;
+    G_wdr_para.sw_wdr_lvl_i_en[1] = (G_wdr_para.sw_wdr_lvl_en&0x2)>>1;
+    G_wdr_para.sw_wdr_lvl_i_en[2] = (G_wdr_para.sw_wdr_lvl_en&0x4)>>2;
+    G_wdr_para.sw_wdr_lvl_i_en[3] = (G_wdr_para.sw_wdr_lvl_en&0x8)>>3;
+    G_wdr_para.sw_wdr_flt_sel     = 1    ; // 1: gaussian pyramid on  0: gaussian pyramid off
+    initWdrPara(G_wdr_para);
+    frameProc();
 
-#ifdef WDR_LOOP_EN
-    INT32 wdrProcess()
-    {
-        LOGE("wdrProcess : wdrProcess is running!\n");
-        //DISP_DEVICE *dispDev = NULL;
-        INT32 frameCount;
+    return 0;
+}
 
-    	for(frameCount = 0; frameCount < FAMENUM; frameCount++)
-    	{
 
-          LOGE("-------------------------------------------------------------\n");
-          LOGE("--------------------------Frame_%d---------------------------\n",frameCount);
-          LOGE("-------------------------------------------------------------\n");
-        //itoa(frameCount, frmnumStr0, 10); //<10
-          sprintf(frmnumStr0,"%02d",frameCount); //<100
-		  G_wdr_para.sw_wdr_lvl_en      = 0xf  ; //initial gaussian levelx4 enable
-          G_wdr_para.sw_wdr_lvl_i_en[0] = (G_wdr_para.sw_wdr_lvl_en&0x1)>>0;
-          G_wdr_para.sw_wdr_lvl_i_en[1] = (G_wdr_para.sw_wdr_lvl_en&0x2)>>1;
-          G_wdr_para.sw_wdr_lvl_i_en[2] = (G_wdr_para.sw_wdr_lvl_en&0x4)>>2;
-          G_wdr_para.sw_wdr_lvl_i_en[3] = (G_wdr_para.sw_wdr_lvl_en&0x8)>>3; 
-          G_wdr_para.sw_wdr_flt_sel     = 1    ; // 1: gaussian pyramid on  0: gaussian pyramid off
-          initWdrPara(G_wdr_para,frmnumStr0);
-			switch(frameCount) { 
-              case 0: 
-              	    #if (FAMENUM > 0x0)
+INT32 main()
+{
+    LOGE("wdrProcess : wdrProcess is running!\n");
+	G_wdr_para.sw_wdr_lvl_en      = 0xf  ; //initial gaussian levelx4 enable
+    G_wdr_para.sw_wdr_lvl_i_en[0] = (G_wdr_para.sw_wdr_lvl_en&0x1)>>0;
+    G_wdr_para.sw_wdr_lvl_i_en[1] = (G_wdr_para.sw_wdr_lvl_en&0x2)>>1;
+    G_wdr_para.sw_wdr_lvl_i_en[2] = (G_wdr_para.sw_wdr_lvl_en&0x4)>>2;
+    G_wdr_para.sw_wdr_lvl_i_en[3] = (G_wdr_para.sw_wdr_lvl_en&0x8)>>3;
+    G_wdr_para.sw_wdr_flt_sel     = 1    ; // 1: gaussian pyramid on  0: gaussian pyramid off
+    initWdrPara(G_wdr_para);
+    frameProc();
 
-                        break;
-                    #endif
-              case 1: 
-              	    #if (FAMENUM > 0x1)
-#ifdef LAST_FRAME_BASED
-                        frameFlag ++;
-#endif
-                        #include CONFIG_PATH"config1.c"
-                        break;
-                    #endif
-              case 2: 
-              	    #if (FAMENUM > 0x2)
-                        frameFlag ++;
-                        #include CONFIG_PATH"config2.c"
-                        break;
-                    #endif
-              case 3: 
-              	    #if (FAMENUM > 0x3)
-                        #include CONFIG_PATH"config3.c"
-                        break;
-                    #endif
-              case 4: 
-              	    #if (FAMENUM > 0x4)
-                        #include CONFIG_PATH"config4.c"
-                        break;
-                    #endif
-              case 5: 
-              	    #if (FAMENUM > 0x5)
-                        #include CONFIG_PATH"config5.c"
-                        break;
-                    #endif
-
-              default: LOGD("->Frame_%d out of range, be careful!\n",frameCount);
-            }
-
-              //#include CONFIG_PATH"config_public.c"
-            frameProc();
-        }
-
-        return 0;
-    }
-
-#else
-
-    INT32 simpleProcess()
-    {
-        //DISP_DEVICE *dispDev = NULL;
-        INT32 frameCount;
-        
-        //MALLOC(dispDev, DISP_DEVICE, 1);
-    
-        for(frameCount = 0; frameCount < 1; frameCount++)
-        {
-            LOGD("------Frame_%d_f0---------\n",frameCount);
-    
-            clearGlobalConfig();
-    
-            //#include CONFIG_PATH"regConfig.c"
-            
-            frameProc();
-    
-        }
-
-        return 0;
-    }
-#endif
+    return 0;
+}
