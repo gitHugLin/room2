@@ -52,8 +52,9 @@ wdrBase::~wdrBase()
 
 bool wdrBase::loadData(string imagePath)
 {
-    //Mat bayer;
-    mSrcImage = imread(imagePath);
+    Mat bayer;
+    bayer = imread("/sdcard/wdr_raw.pgm",0);
+    cvtColor(bayer, mSrcImage, CV_BayerBG2BGR);
     mWidth = mSrcImage.cols;
     mHeight = mSrcImage.rows;
 
@@ -70,10 +71,9 @@ bool wdrBase::loadData(string imagePath)
     mBlockLumiBuff = new Mat(mBlkHeight, mBlkWidth, CV_32SC1);
     memset(mBlockLumiBuff->data,0,mBlkHeight * mBlkWidth * sizeof(int));
 
-    //cvtColor(bayer, mSrcImage, CV_BayerBG2BGR);
     //分离后各通道
     //mSrcImage.convertTo(mSrcImage,CV_16UC1);
-    split(mSrcImage,mBgrChannel);
+    //split(mSrcImage,mBgrChannel);
 
     return 0;
 }
@@ -167,10 +167,11 @@ int wdrBase::getAvgLumiChannel()
     int interval = mSrcImage.channels();
     if(3 != interval) {
         LOGE("ERROR : input rgb image's channel is not 3!");
+        return -1;
     }
     UCHAR channelR, channelG, channelB;
 	UCHAR coeChannelR, coeChannelG, coeChannelB;
-	INT32 lumi;
+	int lumi;
 	UINT32 avgL = 0;
 
 	coeChannelR = 54     ; //channel R   0.2126*256
@@ -220,6 +221,7 @@ int wdrBase::getMaxLumiChannel()
     int interval = mSrcImage.channels();
     if(3 != interval) {
         LOGE("ERROR : input rgb image's channel is not 3!");
+        return -1;
     }
     UCHAR channelR, channelG, channelB;
 	UINT32 avgL = 0;
@@ -315,8 +317,6 @@ int wdrBase::getBlockLumi(bool noise,bool light)
     return 0;
 }
 
-//toneMapping(ppChannelBuff, blkLumiBuff, pLmLpBuff, width,
-		      //  height, bitdepth, &G_wdr_para, blkWidth, blkHeight);
 
 int wdrBase::blkMeansGain(int blkLumi, UINT16 lpLumi)
 {
@@ -350,126 +350,110 @@ int wdrBase::blockCenterIndexUL(int x, int blkCenter, int blkRadius)
 	return blkIndex;
 }
 
-int wdrBase::toneMapping(PTYPE **ppChannelBuff, INT32 *blkLumiMeanBuff,
-            PTYPE *pLmLpBuff, INT32 width, INT32 height, INT32 bitdepth,
-                                WDR_PARAMETER *param, INT8 blkWidth, INT8 blkHeight)
+int wdrBase::toneMapping()
 {
-	INT32 x, y, offset;
-	INT32 row, col;
-	INT32 channelR, channelG, channelB;
-	INT32 channelOR, channelOG, channelOB;
-	INT32 gainOffset1, gainOffset2;
-	INT32 gain;
+    LOGD("toneMapping is begin! ");
+	int x, y,row,col;
+	int channelR, channelG, channelB;
+	int channelOR, channelOG, channelOB;
 	LONG  oldGain;
-	INT32 rgbOffset = param->sw_rgbOffset;//0
-	//INT32 bitdepth = param->sw_img_depth;
-	FILE *fp = NULL;
-
-	INT32 blkRadius, blkCenter;
-	INT32 blkIndexUY, blkIndexLX, blkIndexDY, blkIndexRX;
-	INT32 blkDWeightX, blkDWeightY;
 	LONG  blkDWeightUL, blkDWeightUR, blkDWeightDL, blkDWeightDR;//64bit
-	INT32 blkLumiUL, blkLumiUR, blkLumiDL, blkLumiDR;
-	INT32 blkMapUL, blkMapUR, blkMapDL, blkMapDR;
-	INT32 gainMax = ((param->sw_wdr_gain_max)>>10)<<10; //sw_wdr_gain_max = 0xffff; gainMax = 60
-	PTYPE lpLumi;
-	INT8  inFixBits;
-	//blkHeight = param->sw_block_height;
-	//blkWidth = param->sw_block_width;
-	inFixBits   = 2;
-	gainOffset1 = param->sw_wdr_gain_off1;//0
-	gainOffset2 = param->sw_wdr_gain_off2;//410
+	int rgbOffset = 0, gain;
+	int blkRadius, blkCenter;
+	int blkIndexUY, blkIndexLX, blkIndexDY, blkIndexRX;
+	int blkDWeightX, blkDWeightY;
+	int blkLumiUL, blkLumiUR, blkLumiDL, blkLumiDR;
+	int blkMapUL, blkMapUR, blkMapDL, blkMapDR;
+	int gainMax = (0xffff>>10)<<10; //sw_wdr_gain_max = 0xffff; gainMax = 64512
 
 	blkRadius = TONE_MAP_BLK_SIZE; //256
 	blkCenter = (TONE_MAP_BLK_SIZE>>1)-1 + (TONE_MAP_BLK_SIZE>>1); //xCenter,yCenter = TONE_RADIUS_FIXPOINT_FACTOR( (blkRadius-1 + blkRadius)/2 )
 
-    int round = 0;
-    bool r = true;
-	//get coordinates of four adjacent blocks
-	workBegin();
-	for(y = 0; y < height; y++)
-	{
-		for(x = 0; x < width; x++)
-		{
-		if( y == 0)
-		workBegin();
-			offset = y * width + x;
-			channelR = ppChannelBuff[CHANNEL_RY][offset];
-            channelG = ppChannelBuff[CHANNEL_GCb][offset];
-            channelB = ppChannelBuff[CHANNEL_BCr][offset];
-			lpLumi = pLmLpBuff[offset] >> inFixBits; //from 14bit in gaussian pyramid to 12bit
+    int offset = 0;
+    UINT16 lpLumi;
+    UINT16* pMaxLum = mMaxLumiChannel->ptr<UINT16>(0);
+    INT32* pBlockLum = mBlockLumiBuff->ptr<INT32>(0);
+    UCHAR* pRgb = mSrcImage.ptr<UCHAR>(0);
+
+    for( y = 0; y < mHeight; y++)
+    {
+        for ( x = 0; x < mWidth; x++)
+        {
+            //the default Mat's order is BGR
+            offset = y * mWidth + x;
+        	channelR = *(pRgb+3*offset+2);
+            channelG = *(pRgb+3*offset+1);
+            channelB = *(pRgb+3*offset);
+            lpLumi = *(pMaxLum+offset);
 
 			row = TONE_RADIUS_FIXPOINT_FACTOR(y);   //y*2
 			col = TONE_RADIUS_FIXPOINT_FACTOR(x);   //x*2
-
 			// block center coordinates
 			blkIndexUY = blockCenterIndexUL(row, blkCenter, blkRadius);
 			blkIndexLX = blockCenterIndexUL(col, blkCenter, blkRadius);
 			blkIndexDY = blkIndexUY + TONE_RADIUS_FIXPOINT_FACTOR(TONE_MAP_BLK_SIZE);
 			blkIndexRX = blkIndexLX + TONE_RADIUS_FIXPOINT_FACTOR(TONE_MAP_BLK_SIZE);
 
-			//find out distance between current pixel and each block;
+            //find out distance between current pixel and each block;
 			blkDWeightY = row - blkIndexUY; //distance from upleft = y(or x) - blockCenter_upleft
 			blkDWeightX = col - blkIndexLX;
-
 		    //calculate weight factors of these four blocks (8bit * 8bit)
 		    blkDWeightUL = (TONE_WEIGHT_FIXPOINT_FACTOR(1) - blkDWeightY)*(TONE_WEIGHT_FIXPOINT_FACTOR(1) - blkDWeightX);
 		    blkDWeightUR = (TONE_WEIGHT_FIXPOINT_FACTOR(1) - blkDWeightY)*(blkDWeightX);
 		    blkDWeightDL = (blkDWeightY)*(TONE_WEIGHT_FIXPOINT_FACTOR(1) - blkDWeightX);
 	        blkDWeightDR = (blkDWeightY)*(blkDWeightX);
-
 			// block index for finding out corresponding block lumi average
 			blkIndexUY = MAX(blkCenter, blkIndexUY) >> TONE_WEIGHT_FIXPOINT_BITS; //boundary clip to get average lumi of each block
 			blkIndexLX = MAX(blkCenter, blkIndexLX) >> TONE_WEIGHT_FIXPOINT_BITS;
-			blkIndexDY = MIN(((blkHeight<<TONE_WEIGHT_FIXPOINT_BITS) - blkCenter), blkIndexDY) >> TONE_WEIGHT_FIXPOINT_BITS;
-			blkIndexRX = MIN(((blkWidth<<TONE_WEIGHT_FIXPOINT_BITS) - blkCenter), blkIndexRX) >> TONE_WEIGHT_FIXPOINT_BITS;
+			blkIndexDY = MIN(((mBlkHeight<<TONE_WEIGHT_FIXPOINT_BITS) - blkCenter), blkIndexDY) >> TONE_WEIGHT_FIXPOINT_BITS;
+			blkIndexRX = MIN(((mBlkWidth<<TONE_WEIGHT_FIXPOINT_BITS) - blkCenter), blkIndexRX) >> TONE_WEIGHT_FIXPOINT_BITS;
 
 			//get average luminance of each block( or use data from last frame)
-//workBegin();
-			blkLumiUL = blkLumiMeanBuff[blkIndexUY*blkWidth + blkIndexLX];
-			blkLumiUR = blkLumiMeanBuff[blkIndexUY*blkWidth + blkIndexRX];
-			blkLumiDL = blkLumiMeanBuff[blkIndexDY*blkWidth + blkIndexLX];
-			blkLumiDR = blkLumiMeanBuff[blkIndexDY*blkWidth + blkIndexRX];
-//workEnd("blkLumiMeanBuff TIME COUNT");
-			//figure out gain = (1 + blkLumi*lpLumi + gainOffset1)/(blkLumi + lpLumi + gainOffset2)18bit
-//workBegin();
-			blkMapUL = blkMeansGain(blkLumiUL, lpLumi, gainOffset1, gainOffset2);
-			blkMapUR = blkMeansGain(blkLumiUR, lpLumi, gainOffset1, gainOffset2);
-			blkMapDL = blkMeansGain(blkLumiDL, lpLumi, gainOffset1, gainOffset2);
-			blkMapDR = blkMeansGain(blkLumiDR, lpLumi, gainOffset1, gainOffset2);
-//workEnd("blkMeansGain TIME COUNT");
-		    oldGain = ((blkDWeightUL*blkMapUL)>>18) + ((blkDWeightUR*blkMapUR)>>18) + ((blkDWeightDL*blkMapDL)>>18) + ((blkDWeightDR*blkMapDR)>>18);
-			gain = (INT32)oldGain;
-			//if(param->sw_wdr_gain_max_en)//sw_wdr_gain_max_en = 0
-				//gain = MIN(gain, gainMax);
+			blkLumiUL = *(pBlockLum + blkIndexUY*mBlkWidth + blkIndexLX);
+			blkLumiUR = *(pBlockLum + blkIndexUY*mBlkWidth + blkIndexRX);
+			blkLumiDL = *(pBlockLum + blkIndexDY*mBlkWidth + blkIndexLX);
+			blkLumiDR = *(pBlockLum + blkIndexDY*mBlkWidth + blkIndexRX);
 
-			//get current pixel's luminance after tone mapping
-			channelOR = MIN(FIXPOINT_REVERT((channelR+rgbOffset)*gain, TONE_GAIN_FIXPOINT_BITS), BIT_MASK(bitdepth-2));
-            channelOG = MIN(FIXPOINT_REVERT((channelG+rgbOffset)*gain, TONE_GAIN_FIXPOINT_BITS), BIT_MASK(bitdepth-2));
-            channelOB = MIN(FIXPOINT_REVERT((channelB+rgbOffset)*gain, TONE_GAIN_FIXPOINT_BITS), BIT_MASK(bitdepth-2));
-            ppChannelBuff[CHANNEL_RY][offset]  = channelOR;
-            ppChannelBuff[CHANNEL_GCb][offset] = channelOG;
-            ppChannelBuff[CHANNEL_BCr][offset] = channelOB;
-if( y == 0)
-workEnd("toneMapping TIME COUNT");
-		}
+			blkMapUL = blkMeansGain(blkLumiUL, lpLumi);
+			blkMapUR = blkMeansGain(blkLumiUR, lpLumi);
+			blkMapDL = blkMeansGain(blkLumiDL, lpLumi);
+			blkMapDR = blkMeansGain(blkLumiDR, lpLumi);
 
-	}
+            oldGain = ((blkDWeightUL*blkMapUL)>>18) + ((blkDWeightUR*blkMapUR)>>18) +
+                    ((blkDWeightDL*blkMapDL)>>18) + ((blkDWeightDR*blkMapDR)>>18);
+			gain = (int)oldGain;
+            //get current pixel's luminance after tone mapping
+			channelOR = MIN(FIXPOINT_REVERT((channelR+rgbOffset)*gain
+			        , TONE_GAIN_FIXPOINT_BITS), BIT_MASK(12));
+            channelOG = MIN(FIXPOINT_REVERT((channelG+rgbOffset)*gain
+                    , TONE_GAIN_FIXPOINT_BITS), BIT_MASK(12));
+            channelOB = MIN(FIXPOINT_REVERT((channelB+rgbOffset)*gain
+                    , TONE_GAIN_FIXPOINT_BITS), BIT_MASK(12));
+            channelOR = (channelOR>>4);
+            channelOG = (channelOG>>4);
+            channelOB = (channelOB>>4);
+            *(pRgb+3*offset+2) = (UINT8)channelOR;
+            *(pRgb+3*offset+1) = (UINT8)channelOG;
+            *(pRgb+3*offset) = (UINT8)channelOB;
 
+        }
+    }
+    LOGD("toneMapping is end! ");
 
-	return bitdepth;
+    return 0;
 }
 
 
 
 void wdrBase::process()
 {
-    loadData("/sdcard/input.jpg");
+    loadData("/sdcard");
     initNonlinearCurve();
     workBegin();
     getAvgLumiChannel();
     nonlinearCurveTransfer(mAvgLumiChannel);
     getBlockLumi();
+    toneMapping();
     workEnd("end of process in wdrBase object!");
-    imwrite("/sdcard/wdrBase.jpg",*mAvgLumiChannel);
+    imwrite("/sdcard/wdrDst.jpg",mSrcImage);
 }

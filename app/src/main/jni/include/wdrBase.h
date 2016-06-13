@@ -149,7 +149,7 @@ private:
     int nonlinearCurveTransfer(Mat *avgLumiBuff);
 private:
     int blockCenterIndexUL(int x, int blkCenter, int blkRadius);
-    int blkMeansGain();
+    int blkMeansGain(int blkLumi, UINT16 lpLumi);
     int toneMapping();
 };
 
