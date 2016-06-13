@@ -10,7 +10,7 @@
 #include "include/wdrProcess.h"
 
 
-
+/*
 JNIEXPORT jlong JNICALL processing(JNIEnv *env, jobject obj)
 {
     jfieldID  nameFieldId ;
@@ -21,20 +21,20 @@ JNIEXPORT jlong JNICALL processing(JNIEnv *env, jobject obj)
         LOGE("LOGE: 没有得到 TIME 的句柄ID \n");
     }
 
-    wdrProcess();
+    //wdrProcess();
     double gTime = 0;
     long imgData = 0;
     env->SetDoubleField(obj,nameFieldId ,gTime); // 设置该字段的值
     return (jlong)imgData;
 }
-
+*/
 
 
 static const char *className = "com/example/linqi/wdr/NdkUtils";
 
 //定义方法隐射关系
 static JNINativeMethod methods[] = {
-        {"processing","()J",(void*)processing},
+      //  {"processing","()J",(void*)processing},
 };
 
 jint JNI_OnLoad(JavaVM* vm, void* reserved)

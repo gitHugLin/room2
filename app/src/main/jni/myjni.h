@@ -10,7 +10,7 @@
 extern "C" {
 #endif
 
-JNIEXPORT jlong JNICALL processing(JNIEnv *env, jobject obj);
+//JNIEXPORT jlong JNICALL processing(JNIEnv *env, jobject obj);
 
 
 #ifdef __cplusplus

@@ -1,4 +1,6 @@
 #include "include/wdrProcess.h"
+#include "include/wdrBase.h"
+using namespace wdr;
 
 static double work_begin = 0;
 static double work_end = 0;
@@ -18,7 +20,7 @@ static void workEnd(char *tag)
     LOGE("[TAG: %s ]:TIME = %lf ms \n",tag,gTime);
 }
 
-
+/*
 WDR_PARAMETER G_wdr_para;
 
 INT32 frameFlag = 0;
@@ -110,6 +112,7 @@ INT32 frameProc()
         0);
 
 	/************************************Luminance linear to nonlinear*************************************/
+	/*
 	initNonlinearCurve(&nonlCurve, &G_wdr_para);
 
     //get Y chanel
@@ -141,6 +144,7 @@ workBegin();
 		LOGE("Error in low pass luminance!\n");
 
 /***************************************** Gaussian Pyramid *************************************/
+/*
     //get low-pass filter output, LUMI_FIXPOINT_BITS
 	if(G_wdr_para.sw_wdr_flt_sel == 0x0) // gaussian pyramid
 	{
@@ -164,6 +168,7 @@ workBegin();
 	bitdepth += LUMI_FIXPOINT_BITS;//bitdepth 14 bit
 
 	/************************************** WDR tone mapping ********************************/
+	/*
 	if(G_wdr_para.sw_wdr_blk_sel == 0)  //global method
 	{   //for next frame with sw_wdr_blk_sel=1
 
@@ -255,24 +260,12 @@ INT32 wdrProcess()
     G_wdr_para.sw_wdr_lvl_i_en[2] = (G_wdr_para.sw_wdr_lvl_en&0x4)>>2;
     G_wdr_para.sw_wdr_lvl_i_en[3] = (G_wdr_para.sw_wdr_lvl_en&0x8)>>3;
     G_wdr_para.sw_wdr_flt_sel     = 1    ; // 1: gaussian pyramid on  0: gaussian pyramid off
-    initWdrPara(G_wdr_para);
-    frameProc();
+    //initWdrPara(G_wdr_para);
+    //frameProc();
 
     return 0;
 }
 
+*/
 
-INT32 main()
-{
-    LOGE("wdrProcess : wdrProcess is running!\n");
-	G_wdr_para.sw_wdr_lvl_en      = 0xf  ; //initial gaussian levelx4 enable
-    G_wdr_para.sw_wdr_lvl_i_en[0] = (G_wdr_para.sw_wdr_lvl_en&0x1)>>0;
-    G_wdr_para.sw_wdr_lvl_i_en[1] = (G_wdr_para.sw_wdr_lvl_en&0x2)>>1;
-    G_wdr_para.sw_wdr_lvl_i_en[2] = (G_wdr_para.sw_wdr_lvl_en&0x4)>>2;
-    G_wdr_para.sw_wdr_lvl_i_en[3] = (G_wdr_para.sw_wdr_lvl_en&0x8)>>3;
-    G_wdr_para.sw_wdr_flt_sel     = 1    ; // 1: gaussian pyramid on  0: gaussian pyramid off
-    initWdrPara(G_wdr_para);
-    frameProc();
 
-    return 0;
-}

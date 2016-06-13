@@ -16,12 +16,12 @@
 #include "include/toneMap.h"
 #include "include/nonlinearCurve.h"
 
-INT32 clearGlobalConfig();
+//INT32 clearGlobalConfig();
 
-INT32 frameProc();
+//INT32 frameProc();
 
-INT32 wdrProcess();
+//INT32 wdrProcess();
 
-INT32 simpleProcess();
+//INT32 simpleProcess();
 
 #endif //WDR_WDRPROCESS_H
