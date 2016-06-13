@@ -41,42 +41,6 @@ namespace wdr{
 #define BITS_SET(dst, val, offset, count) ((dst)|(((val) & (BIT_MASK(count))) << (offset)))
 #define BITS_REVERT(src, mask)            ((src) = (~(src))&(mask))                    //extract some bits and revert, clear other bits
 
-
-#define MAX_ALPHA_VAL   255
-
-#define RGB565_B_SHIFT  0
-#define RGB565_G_SHIFT  5
-#define RGB565_R_SHIFT  11
-
-#define RGB666_B_SHIFT  0
-#define RGB666_G_SHIFT  6
-#define RGB666_R_SHIFT  12
-
-#define RGB888_B_SHIFT  0
-#define RGB888_G_SHIFT  8
-#define RGB888_R_SHIFT  16
-#define ARGB888_A_SHIFT  24
-
-#define RGB101010_B_SHIFT  0
-#define RGB101010_G_SHIFT  10
-#define RGB101010_R_SHIFT  20
-
-
-#define RGB565_GET_B5(RGB565Val)  (((RGB565Val) >> RGB565_B_SHIFT) & 0x1F)
-#define RGB565_GET_G6(RGB565Val)  (((RGB565Val) >> RGB565_G_SHIFT) & 0x3F)
-#define RGB565_GET_R5(RGB565Val)  (((RGB565Val) >> RGB565_R_SHIFT) & 0x1F)
-
-#define RGB888_GET_B8(RGB888Val)  (((RGB888Val) >> RGB888_B_SHIFT) & 0xFF)
-#define RGB888_GET_G8(RGB888Val)  (((RGB888Val) >> RGB888_G_SHIFT) & 0xFF)
-#define RGB888_GET_R8(RGB888Val)  (((RGB888Val) >> RGB888_R_SHIFT) & 0xFF)
-
-
-#define GET_RGB565(R5, G6, B5)  ((((R5)&0x1F)<<RGB565_R_SHIFT)|(((G6)&0x3F)<<RGB565_G_SHIFT)|(((B5)&0x1F)<<RGB565_B_SHIFT))
-#define GET_RGB666(R6, G6, B6)  ((((R6)&0x3F)<<RGB666_R_SHIFT)|(((G6)&0x3F)<<RGB666_G_SHIFT)|(((B6)&0x3F)<<RGB666_B_SHIFT))
-#define GET_RGB888(R8, G8, B8)  ((((R8)&0xFF)<<RGB888_R_SHIFT)|(((G8)&0xFF)<<RGB888_G_SHIFT)|(((B8)&0xFF)<<RGB888_B_SHIFT))
-#define GET_RGB101010(R10, G10, B10)  ((((R10)&0x3FF)<<RGB101010_R_SHIFT)|(((G10)&0x3FF)<<RGB101010_G_SHIFT)|(((B10)&0x3FF)<<RGB101010_B_SHIFT))
-#define GET_ARGB888(A8, R8, G8, B8)  ((((A8)&0xFF)<<ARGB888_A_SHIFT)|(((R8)&0xFF)<<RGB888_R_SHIFT)|(((G8)&0xFF)<<RGB888_G_SHIFT)|(((B8)&0xFF)<<RGB888_B_SHIFT))
-
 /****************************************************************/
 
 typedef int            INT32;
@@ -124,7 +88,7 @@ public:
     ~wdrBase();
 public:
     void process();
-    bool loadData(string imagePath);
+    bool loadData(string imagePath,bool pgm = false);
 private:
     int mWidth;
     int mHeight;

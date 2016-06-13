@@ -29,7 +29,7 @@ wdrBase::wdrBase()
     mHeight = 0;
     mBlkWidth = 0;
     mBlkHeight = 0;
-    mGainOffset = 400;
+    mGainOffset = 410;
 
     mAvgLumiChannel = NULL;
     mMaxLumiChannel = NULL;
@@ -50,11 +50,15 @@ wdrBase::~wdrBase()
     mBlockLumiBuff = NULL;
 }
 
-bool wdrBase::loadData(string imagePath)
+bool wdrBase::loadData(string imagePath,bool pgm)
 {
-    Mat bayer;
-    bayer = imread("/sdcard/wdr_raw.pgm",0);
-    cvtColor(bayer, mSrcImage, CV_BayerBG2BGR);
+    if(pgm) {
+        Mat bayer;
+        bayer = imread(imagePath,0);
+        cvtColor(bayer, mSrcImage, CV_BayerBG2RGB);
+    } else {
+        mSrcImage = imread(imagePath);
+    }
     mWidth = mSrcImage.cols;
     mHeight = mSrcImage.rows;
 
@@ -322,8 +326,12 @@ int wdrBase::blkMeansGain(int blkLumi, UINT16 lpLumi)
 {
 	int lumiGain, newLumi;
 
-	newLumi =  (TONE_BLK_FIXPOINT_FACTOR(1) + (blkLumi*lpLumi >> TONE_BLK_FIXPOINT_BITS));
+    //figure out gain = (1 + blkLumi*lpLumi + gainOffset1)/(blkLumi + lpLumi + gainOffset2)
+	newLumi =  (TONE_BLK_FIXPOINT_FACTOR(1) + (blkLumi*(int)lpLumi >> TONE_BLK_FIXPOINT_BITS) );
 	lumiGain = TONE_GAIN_FIXPOINT_FACTOR(newLumi)/(blkLumi + lpLumi + mGainOffset);
+
+	//newLumi =  1 + blkLumi*lpLumi ;
+    //lumiGain = newLumi/(blkLumi + lpLumi + mGainOffset);
 	lumiGain = MIN(lumiGain, 0x3ffff); //gain 18bit
 
 	return lumiGain;
@@ -364,7 +372,7 @@ int wdrBase::toneMapping()
 	int blkDWeightX, blkDWeightY;
 	int blkLumiUL, blkLumiUR, blkLumiDL, blkLumiDR;
 	int blkMapUL, blkMapUR, blkMapDL, blkMapDR;
-	int gainMax = (0xffff>>10)<<10; //sw_wdr_gain_max = 0xffff; gainMax = 64512
+	//int gainMax = (0xffff>>10)<<10; //sw_wdr_gain_max = 0xffff; gainMax = 64512
 
 	blkRadius = TONE_MAP_BLK_SIZE; //256
 	blkCenter = (TONE_MAP_BLK_SIZE>>1)-1 + (TONE_MAP_BLK_SIZE>>1); //xCenter,yCenter = TONE_RADIUS_FIXPOINT_FACTOR( (blkRadius-1 + blkRadius)/2 )
@@ -381,9 +389,9 @@ int wdrBase::toneMapping()
         {
             //the default Mat's order is BGR
             offset = y * mWidth + x;
-        	channelR = *(pRgb+3*offset+2);
+        	channelR = *(pRgb+3*offset);
             channelG = *(pRgb+3*offset+1);
-            channelB = *(pRgb+3*offset);
+            channelB = *(pRgb+3*offset+2);
             lpLumi = *(pMaxLum+offset);
 
 			row = TONE_RADIUS_FIXPOINT_FACTOR(y);   //y*2
@@ -402,6 +410,7 @@ int wdrBase::toneMapping()
 		    blkDWeightUR = (TONE_WEIGHT_FIXPOINT_FACTOR(1) - blkDWeightY)*(blkDWeightX);
 		    blkDWeightDL = (blkDWeightY)*(TONE_WEIGHT_FIXPOINT_FACTOR(1) - blkDWeightX);
 	        blkDWeightDR = (blkDWeightY)*(blkDWeightX);
+
 			// block index for finding out corresponding block lumi average
 			blkIndexUY = MAX(blkCenter, blkIndexUY) >> TONE_WEIGHT_FIXPOINT_BITS; //boundary clip to get average lumi of each block
 			blkIndexLX = MAX(blkCenter, blkIndexLX) >> TONE_WEIGHT_FIXPOINT_BITS;
@@ -419,9 +428,10 @@ int wdrBase::toneMapping()
 			blkMapDL = blkMeansGain(blkLumiDL, lpLumi);
 			blkMapDR = blkMeansGain(blkLumiDR, lpLumi);
 
-            oldGain = ((blkDWeightUL*blkMapUL)>>18) + ((blkDWeightUR*blkMapUR)>>18) +
-                    ((blkDWeightDL*blkMapDL)>>18) + ((blkDWeightDR*blkMapDR)>>18);
+            oldGain = ((blkDWeightUL*blkMapUL)>>16) + ((blkDWeightUR*blkMapUR)>>16) +
+                    ((blkDWeightDL*blkMapDL)>>16) + ((blkDWeightDR*blkMapDR)>>16);
 			gain = (int)oldGain;
+			//gain = MIN(gain, gainMax);
             //get current pixel's luminance after tone mapping
 			channelOR = MIN(FIXPOINT_REVERT((channelR+rgbOffset)*gain
 			        , TONE_GAIN_FIXPOINT_BITS), BIT_MASK(12));
@@ -432,9 +442,9 @@ int wdrBase::toneMapping()
             channelOR = (channelOR>>4);
             channelOG = (channelOG>>4);
             channelOB = (channelOB>>4);
-            *(pRgb+3*offset+2) = (UINT8)channelOR;
+            *(pRgb+3*offset) = (UINT8)channelOR;
             *(pRgb+3*offset+1) = (UINT8)channelOG;
-            *(pRgb+3*offset) = (UINT8)channelOB;
+            *(pRgb+3*offset+2) = (UINT8)channelOB;
 
         }
     }
@@ -447,7 +457,8 @@ int wdrBase::toneMapping()
 
 void wdrBase::process()
 {
-    loadData("/sdcard");
+    loadData("/sdcard/windos.jpg");
+    imwrite("/sdcard/wdrSrc.jpg",mSrcImage);
     initNonlinearCurve();
     workBegin();
     getAvgLumiChannel();
